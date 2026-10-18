@@ -1,6 +1,14 @@
 import XCTest
 @testable import UTubeMusic
 
+final class EmbeddedRuntimeTests: XCTestCase {
+    func testEmbeddedPythonAndWebKitProviderImportWithoutNetwork() async throws {
+        let response = try await PythonService.shared.request(["op": "selftest"])
+        XCTAssertTrue(response.ok)
+        XCTAssertEqual(response.songs?.count, 0)
+    }
+}
+
 final class QueueTests: XCTestCase {
     func testSequentialStopsAtEndAndManualNextOverridesRepeatOne() {
         var q = PlaybackQueue(); q.start(["a", "b", "c"], at: "a")

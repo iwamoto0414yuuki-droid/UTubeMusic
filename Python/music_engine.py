@@ -76,6 +76,15 @@ def dispatch(request_json):
                    "retries": 1, "extractor_retries": 1, "nocheckcertificate": False,
                    "ca_certs": certifi.where()}
         op = request.get("op")
+        if op == "selftest":
+            # Runs in the iOS simulator test host without accessing the network.
+            # These imports exercise the packaged native extension loader as well.
+            import ssl
+            import ctypes
+            from yt_dlp_plugins.extractor.ytjsc import AppleWebKitJCP
+            with YoutubeDL(options):
+                pass
+            return json.dumps({"ok": True, "songs": []})
         if op == "search":
             query = str(request.get("query", "")).strip()[:200]
             if not query:
