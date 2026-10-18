@@ -120,4 +120,19 @@ final class ScreenCaptureTests: XCTestCase {
         defer { player.pause() }
         try await render(RootView(initialTab: 2).environmentObject(library).environmentObject(player).environmentObject(music), name: "native-library")
     }
+    func testCaptureRemoteAlbum() async throws {
+        let (library, player, music, _) = try playableLibrary()
+        defer { player.pause() }
+        let data = Data(#"{"ok":true,"collection":{"id":"MPREb_preview","kind":"album","title":"Piano Collection","subtitle":"画面確認用","thumbnail":null},"songs":[{"id":"00000000001","title":"Morning Light","artist":"画面確認用","duration":180},{"id":"00000000002","title":"Quiet Room","artist":"画面確認用","duration":210},{"id":"00000000003","title":"After Hours","artist":"画面確認用","duration":190}]}"#.utf8)
+        let response = try JSONDecoder().decode(EngineResponse.self, from: data)
+        let item = try XCTUnwrap(response.collection)
+        let store = CatalogStore { _ in response }
+        await store.open(item)
+        try await render(NavigationStack { RemoteCollectionView(item: item, store: store) }.environmentObject(library).environmentObject(player).environmentObject(music), name: "native-album")
+    }
+    func testCaptureBatchSave() async throws {
+        let (library, player, music, song) = try playableLibrary()
+        defer { player.pause() }
+        try await render(BatchSaveSheet(title: "Piano Collection", sourceID: "MPREb_preview", songs: [song], onSaved: {}).environmentObject(library).environmentObject(player).environmentObject(music), name: "native-batch-save")
+    }
 }

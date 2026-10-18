@@ -30,3 +30,7 @@ yt-dlp-apple-webkit-jsi: Apache 2.0 and bundled component notices.
 All installed wheel license/notice files are appended during preparation.
 
 Keraunos was researched as an architectural reference. Its code is not included.
+
+ytmusicapi: MIT. requests: Apache 2.0. urllib3: MIT.
+charset-normalizer: MIT. idna: BSD 3-Clause.
+Exact installed wheel license files are included in ThirdPartyNotices.txt.

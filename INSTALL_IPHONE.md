@@ -1,8 +1,16 @@
 # UTube MusicをiPhoneに入れる（Windows / 無料）
 
-対象: iPhone 14、利用者申告 iOS 27.0.1。2026-10-18。
+対象: iPhone 14、利用者申告 iOS 27.0.1。2026-10-19。
 
-SideStoreとLocalDevVPNがまだ入っていない方の手順です。初回はWindows PCとiPhoneをUSBケーブルで接続します。Apple Account・端末パスコードの入力はご本人が行ってください。このアプリの開発者へ送る必要はありません。
+## 導入済みの方：0.2.0へ更新
+
+1. 念のため「ファイル」→「このiPhone内」→「UTube Music」→「UTubeMusic」をフォルダーごとコピーしておく。
+2. 新しい `release/UTubeMusic-0.2.0-unsigned.ipa` をiPhoneの「ファイル」へ渡す。
+3. Wi-FiとLocalDevVPNをオンにし、前回と同じApple AccountのSideStoreで＋から新しいIPAを選ぶ。
+4. 既存のUTube Musicへ上書き更新する。**先にアプリを削除しない。** 同じアプリIDで曲・プレイリストを引き継ぐ構成です。
+5. 設定のバージョンが0.2.0になり、保存した曲が残っていることを確認する。
+
+初回導入の手順は以下です。初回はWindows PCとiPhoneをUSBケーブルで接続します。Apple Account・端末パスコードの入力はご本人が行ってください。このアプリの開発者へ送る必要はありません。
 
 ## 1. iPhoneにLocalDevVPNを入れる
 
@@ -27,9 +35,9 @@ iPhoneで[LocalDevVPNのApp Storeページ](https://apps.apple.com/jp/app/locald
 
 ## 3. UTube MusicのIPAを入れる
 
-**0.1.0のXcodeビルドに成功し、SideStore用IPAを作成しました。** Windows側の `release/UTubeMusic-0.1.0-unsigned.ipa` を使います。これは初回の実機確認向け試作版です。ソースコードZIPはインストールできません。
+0.2.0のSideStore用IPAは、テストと実機向けビルドに成功後に `release/` に保存します。 Windows側の `release/UTubeMusic-0.2.0-unsigned.ipa` を使います。個人用の開発版です。ソースコードZIPはインストールできません。
 
-1. Windowsにある `UTubeMusic-0.1.0-unsigned.ipa` を、ご自身のiCloud Driveや普段使うファイル転送手段でiPhoneの「ファイル」アプリへ渡す。メールなどで他人へ配布する必要はありません。
+1. Windowsにある `UTubeMusic-0.2.0-unsigned.ipa` を、ご自身のiCloud Driveや普段使うファイル転送手段でiPhoneの「ファイル」アプリへ渡す。メールなどで他人へ配布する必要はありません。
 2. iPhoneをWi-Fiへ接続し、LocalDevVPNをConnectにする。
 3. SideStore → My Apps → 追加（＋）からIPAを選択し、署名・インストールが終わるまで待つ。
 4. ホーム画面の「UTube Music」を開く。
@@ -45,6 +53,17 @@ iPhoneで[LocalDevVPNのApp Storeページ](https://apps.apple.com/jp/app/locald
 5. 保存後は機内モードでも再生できるか確認する。
 
 取得元の仕様・制限により、保存できない曲があります。エラー時は「保存の状況」から再試行します。保存が完了していない曲はライブラリへ登録しません。
+
+## 0.2.0の使い方
+
+- ホーム：お気に入り・保存した曲・自分のプレイリストと、YouTube Musicの公開おすすめを表示。Googleアカウントの個人向け推薦とは異なります。
+- 検索：「曲」「プレイリスト」「アルバム」を切り替える。「さらに表示」で追加の結果を表示。気分・ジャンル別の入口も検索画面にあります。
+- リンク：公開プレイリストの `music.youtube.com/playlist?list=...` やアルバムの `/browse/MPRE...` を貼り付け、「プレイリスト・アルバムを開く」を押す。
+- まとめて保存：詳細画面の「まとめて保存」から開始。同名のローカルプレイリストに曲順を保って保存。再試行時は同じ取得元のリストを再利用します。保存中はアプリを開いておきます。
+- 保存画面：お気に入りは初期オン。プレイリストは複数選択可能で、新規作成も可能です。両方を選べば両方に追加、すべてオフでも曲自体は「保存した曲」に残ります。
+- 保存の状況：1曲ずつ処理し、進行・失敗・再試行・個別中止・すべて中止を表示。中止しても完了済みの曲は残ります。
+
+非公開・地域制限・取得不可の曲は保存できない場合があります。収録曲一覧には除外した件数を表示します。1000曲を超えるリストは途中までを全曲として保存せず、分割を案内します。
 
 ## 毎週の更新
 

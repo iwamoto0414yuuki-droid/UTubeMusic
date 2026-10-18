@@ -7,6 +7,7 @@ final class SearchScreenState: ObservableObject {
     @Published var kind = "songs"
     @Published var generation = UUID()
     var lastToken: UUID?
+    var requestedGeneration: UUID?
     let search = SongSearchStore()
     let catalog = CatalogStore()
 }
@@ -16,6 +17,7 @@ struct SearchScreenView: View {
     let token: UUID
     let openDownloads: () -> Void
     @ObservedObject var state: SearchScreenState
+    @FocusState private var searchFocused: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -26,6 +28,7 @@ struct SearchScreenView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Palette.secondary)
                 TextField("曲名、アーティスト、YouTubeリンク", text: $state.query)
+                    .focused($searchFocused)
                     .font(.subheadline).autocorrectionDisabled().textInputAutocapitalization(.never).submitLabel(.search).onSubmit(submit)
                 if !state.query.isEmpty {
                     IconButton(symbol: "xmark.circle.fill", label: "検索をクリア", color: Palette.secondary, size: 17) { state.query = ""; submit() }
@@ -65,6 +68,8 @@ struct SearchScreenView: View {
                 if state.lastToken != token { state.lastToken = token; state.query = initialQuery; state.kind = "songs"; submit() }
             }
             .task(id: state.generation) {
+                guard state.requestedGeneration != state.generation else { return }
+                state.requestedGeneration = state.generation
                 guard CatalogItem.link(state.submitted) == nil else { return }
                 if state.kind == "songs" { await state.search.search(state.submitted) }
                 else { await state.catalog.search(state.submitted, kind: state.kind) }
@@ -77,5 +82,9 @@ struct SearchScreenView: View {
                 .foregroundStyle(state.kind == value ? Color.black : Palette.text)
         }.buttonStyle(.plain).accessibilityAddTraits(state.kind == value ? .isSelected : [])
     }
-    private func submit() { state.submitted = state.query.trimmingCharacters(in: .whitespacesAndNewlines); state.generation = UUID() }
+    private func submit() {
+        searchFocused = false
+        state.submitted = state.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        state.generation = UUID()
+    }
 }

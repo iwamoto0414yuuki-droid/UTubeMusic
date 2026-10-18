@@ -131,9 +131,10 @@ struct CatalogSearchResults: View {
     }
 }
 
+@MainActor
 struct RemoteCollectionView: View {
     let item: CatalogItem
-    @StateObject private var store = CatalogStore()
+    @StateObject private var store: CatalogStore
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var music: MusicService
     @EnvironmentObject private var player: PlayerStore
@@ -141,6 +142,11 @@ struct RemoteCollectionView: View {
     @State private var menu: Song?
     @State private var confirm = false
     @State private var showDownloads = false
+    @State private var batchQueued = false
+    init(item: CatalogItem, store: CatalogStore? = nil) {
+        self.item = item
+        _store = StateObject(wrappedValue: store ?? CatalogStore())
+    }
     private var displayed: CatalogItem { store.collection ?? item }
     var body: some View {
         ScrollView {
@@ -175,12 +181,11 @@ struct RemoteCollectionView: View {
             .task { if !store.loaded { await store.open(item) } }
             .sheet(item: $save) { SaveSongSheet(song: $0) }.sheet(item: $menu) { SongActionsSheet(song: $0) }
             .sheet(isPresented: $showDownloads) { DownloadsView() }
-            .sheet(isPresented: $confirm) {
+            .sheet(isPresented: $confirm, onDismiss: {
+                if batchQueued { batchQueued = false; showDownloads = true }
+            }) {
                 BatchSaveSheet(title: displayed.title, sourceID: displayed.id, songs: store.songs) {
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 400_000_000)
-                        showDownloads = true
-                    }
+                    batchQueued = music.jobs.contains { !$0.finished && $0.error == nil }
                 }
             }
     }

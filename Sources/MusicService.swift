@@ -77,8 +77,10 @@ final class MusicService: ObservableObject {
             return
         }
         guard !library.recoveryNeeded else { library.message = "ライブラリの復元が必要です。"; return }
-        guard !jobs.contains(where: { $0.song.id == song.id && !$0.finished && $0.error == nil }) else {
-            library.message = "この曲は保存中です。"; return
+        if let index = jobs.firstIndex(where: { $0.song.id == song.id && !$0.finished && $0.error == nil }) {
+            jobs[index].playlistIDs.formUnion(playlistIDs)
+            jobs[index].song.favorite = jobs[index].song.favorite || favorite
+            library.message = "保存中の曲に、選んだ追加先を反映しました。"; return
         }
         let id = UUID()
         var song = song; song.favorite = favorite
@@ -107,6 +109,8 @@ final class MusicService: ObservableObject {
                 jobs[index].song.favorite = jobs[index].song.favorite || favorite
             } else { save(song, favorite: favorite, playlistIDs: [playlistID]) }
         }
+        let remaining = songs.filter { library.song($0.id).map(library.isAvailable) != true }.count
+        library.message = remaining == 0 ? "\(songs.count)曲を「\(title)」に追加しました。すべて保存済みです。" : "「\(title)」にまとめます。未保存の\(remaining)曲は順番に保存します。"
     }
     func dismiss(_ id: UUID) { guard tasks[id] == nil else { return }; jobs.removeAll { $0.id == id } }
     func retry(_ id: UUID) {
