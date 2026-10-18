@@ -10,6 +10,17 @@ import urllib.parse
 VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 
+def webkit_selftest():
+    from yt_dlp_plugins.webkit_jsi.lib.easy import WKJSE_Factory, WKJSE_Webview
+    from yt_dlp_plugins.webkit_jsi.lib.logging import DefaultLoggerImpl
+    messages = []
+    with WKJSE_Factory(DefaultLoggerImpl()) as send, WKJSE_Webview(send) as webview:
+        webview.on_script_log(messages.append)
+        webview.execute_js("console.log(6 * 7)")
+    if not any(message.get("argsArr") == [42] for message in messages):
+        raise RuntimeError("Embedded WebKit did not return the expected JavaScript result")
+
+
 def video_id(value):
     value = value.strip()
     if VIDEO_ID.fullmatch(value):
@@ -84,17 +95,18 @@ def dispatch(request_json):
             from yt_dlp_plugins.extractor.ytjsc import AppleWebKitJCP
             with YoutubeDL(options):
                 pass
+            webkit_selftest()
             return json.dumps({"ok": True, "songs": []})
         if op == "search":
             query = str(request.get("query", "")).strip()[:200]
             if not query:
                 return json.dumps({"ok": True, "songs": []})
-            try:
-                ident = video_id(query)
-            except ValueError:
-                if "://" in query or "youtube.com/" in query or "youtu.be/" in query:
+            ident = None
+            if "://" in query or query.startswith(("youtube.com/", "www.youtube.com/", "music.youtube.com/", "m.youtube.com/", "youtu.be/")):
+                try:
+                    ident = video_id(query)
+                except ValueError:
                     raise ValueError("YouTubeの曲単体のリンクを確認してください。")
-                ident = None
             options["extract_flat"] = "in_playlist"
             with YoutubeDL(options) as ydl:
                 data = ydl.extract_info("https://www.youtube.com/watch?v=" + ident if ident else "ytsearch20:" + query + " 音楽", download=False)
@@ -116,5 +128,8 @@ def dispatch(request_json):
         raise ValueError("未対応の操作です。")
     except Exception as exc:
         # Do not expose expiring media URLs, tokens or a Python traceback to the UI.
-        message = str(exc) if isinstance(exc, ValueError) else "取得元から曲を読み込めませんでした。通信を確認して再試行してください。取得制限や仕様変更が原因の場合もあります。"
+        if isinstance(locals().get("request"), dict) and request.get("op") == "selftest":
+            message = type(exc).__name__ + ": " + str(exc)
+        else:
+            message = str(exc) if isinstance(exc, ValueError) else "取得元から曲を読み込めませんでした。通信を確認して再試行してください。取得制限や仕様変更が原因の場合もあります。"
         return json.dumps({"ok": False, "error": message}, ensure_ascii=False)

@@ -34,11 +34,13 @@ jobs:
               f.write('SIMULATOR_ID=' + phones[0]['udid'] + '\n')
           PY
       - name: Native build and queue/library tests
+        timeout-minutes: 10
         run: |
           xcodebuild -project UTubeMusic.xcodeproj -scheme UTubeMusic -configuration Debug \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/simulator \
-            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test >build/native-tests.log 2>&1 \
-            || { grep -n -A4 -B2 'error:' build/native-tests.log || true; tail -100 build/native-tests.log; exit 1; }
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 \
+            CODE_SIGNING_ALLOWED=NO test 2>&1 | tee build/native-tests.log
       - name: Capture running native home screen
         run: |
           xcrun simctl launch "$SIMULATOR_ID" local.utubemusic.player
@@ -56,7 +58,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
       - name: Build logs
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: build-diagnostics

@@ -63,7 +63,7 @@ final class LibraryTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         return root
     }
-    func testDeleteRemovesFileAndPlaylistReferencesAndAllowsResave() throws {
+    func testDeleteRemovesFileAndPlaylistReferencesAndAllowsResave() async throws {
         let root = try makeRoot(), store = LibraryStore(root: root)
         let file = root.appendingPathComponent("song.m4a")
         try Data([1, 2, 3]).write(to: file)
@@ -82,7 +82,7 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(reloaded.songs[0].id, song.id)
         XCTAssertEqual(reloaded.playlists[0].songIDs, [song.id])
     }
-    func testCorruptIndexIsNeverOverwritten() throws {
+    func testCorruptIndexIsNeverOverwritten() async throws {
         let root = try makeRoot(), url = root.appendingPathComponent("library.json")
         let original = Data("not JSON".utf8); try original.write(to: url)
         let store = LibraryStore(root: root)
@@ -90,7 +90,7 @@ final class LibraryTests: XCTestCase {
         XCTAssertThrowsError(try store.createPlaylist("New"))
         XCTAssertEqual(try Data(contentsOf: url), original)
     }
-    func testWriteFailureRollsBackStateAndKeepsAudio() throws {
+    func testWriteFailureRollsBackStateAndKeepsAudio() async throws {
         let root = try makeRoot(), store = LibraryStore(root: root)
         let song = Song(id: "a", title: "A", artist: "B", duration: 10, fileName: "a.m4a")
         try Data([1]).write(to: root.appendingPathComponent("a.m4a"))
@@ -99,7 +99,7 @@ final class LibraryTests: XCTestCase {
         XCTAssertThrowsError(try store.delete(song))
         XCTAssertEqual(store.songs.count, 1); XCTAssertTrue(store.isAvailable(song))
     }
-    func testPlaylistReorderAndDeleteKeepSongs() throws {
+    func testPlaylistReorderAndDeleteKeepSongs() async throws {
         let store = LibraryStore(root: try makeRoot())
         let id = try store.createPlaylist("Mix")
         for key in ["a", "b", "c", "d"] { try store.save(Song(id: key, title: key, artist: "Artist", duration: 1), playlistID: id) }
@@ -108,7 +108,7 @@ final class LibraryTests: XCTestCase {
         try store.deletePlaylist(id)
         XCTAssertEqual(store.songs.count, 4); XCTAssertTrue(store.playlists.isEmpty)
     }
-    func testUntrustedFileNamesStayInsideLibrary() throws {
+    func testUntrustedFileNamesStayInsideLibrary() async throws {
         let store = LibraryStore(root: try makeRoot())
         for path in ["../escape", "/tmp/escape", "..", "a\\b", ""] { XCTAssertNil(store.file(path)) }
         XCTAssertEqual(store.file("safe.m4a")?.deletingLastPathComponent(), store.root)

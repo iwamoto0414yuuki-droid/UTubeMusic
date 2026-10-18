@@ -58,16 +58,20 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(song["title"], "Song title"); self.assertEqual(song["artist"], "Artist"); self.assertEqual(song["duration"], 0)
 
     def test_search_contract_and_error_does_not_leak_tokens(self):
+        queries = []
         class FakeYDL:
             def __init__(self, options): pass
             def __enter__(self): return self
             def __exit__(self, *args): pass
             def extract_info(self, query, download=False):
+                queries.append(query)
                 if "failure" in query: raise RuntimeError("secret token=abc media URL")
                 return {"_type": "playlist", "entries": [{"id": ID, "title": "Song", "duration": 15}, None, {"id": "bad"}]}
         with patch.dict(sys.modules, {"yt_dlp": types.SimpleNamespace(YoutubeDL=FakeYDL), "certifi": types.SimpleNamespace(where=lambda: "ca.pem")}):
             result = json.loads(engine.dispatch(json.dumps({"op": "search", "query": "Song"})))
             self.assertTrue(result["ok"]); self.assertEqual(len(result["songs"]), 1)
+            engine.dispatch(json.dumps({"op": "search", "query": "TaylorSwift"}))
+            self.assertTrue(queries[-1].startswith("ytsearch20:TaylorSwift"))
             error = engine.dispatch(json.dumps({"op": "search", "query": "failure"}))
             self.assertNotIn("secret", error); self.assertFalse(json.loads(error)["ok"])
 
