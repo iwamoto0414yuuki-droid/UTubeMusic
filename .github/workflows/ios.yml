@@ -41,21 +41,11 @@ jobs:
             -parallel-testing-enabled NO -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 \
             CODE_SIGNING_ALLOWED=NO test 2>&1 | tee build/native-tests.log
-      - name: Capture running native home screen
-        timeout-minutes: 4
+      - name: Export native screen attachments
         run: |
-          xcrun simctl boot "$SIMULATOR_ID" || true
-          xcrun simctl bootstatus "$SIMULATOR_ID" -b
-          xcrun simctl install "$SIMULATOR_ID" build/simulator/Build/Products/Debug-iphonesimulator/UTubeMusic.app
-          xcrun simctl launch "$SIMULATOR_ID" local.utubemusic.player
-          sleep 3
-          xcrun simctl io "$SIMULATOR_ID" screenshot build/native-home.png
-          xcrun simctl terminate "$SIMULATOR_ID" local.utubemusic.player
-          APP_CONTAINER=$(xcrun simctl get_app_container "$SIMULATOR_ID" local.utubemusic.player data)
-          python3 scripts/simulator_fixture.py "$APP_CONTAINER/Documents/UTubeMusic"
-          xcrun simctl launch "$SIMULATOR_ID" local.utubemusic.player --preview-player
-          sleep 3
-          xcrun simctl io "$SIMULATOR_ID" screenshot build/native-player.png
+          RESULT_BUNDLE=$(find build/simulator/Logs/Test -maxdepth 1 -name '*.xcresult' -print -quit)
+          xcrun xcresulttool export attachments --path "$RESULT_BUNDLE" --output-path build/screenshots
+          python3 scripts/collect_screenshots.py
       - name: Build SideStore IPA
         run: bash scripts/build_ipa.sh
       - uses: actions/upload-artifact@v4
