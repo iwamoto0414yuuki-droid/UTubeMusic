@@ -35,7 +35,7 @@ iPhoneで[LocalDevVPNのApp Storeページ](https://apps.apple.com/jp/app/locald
 
 ## 3. UTube MusicのIPAを入れる
 
-0.2.0のSideStore用IPAは、テストと実機向けビルドに成功後に `release/` に保存します。 Windows側の `release/UTubeMusic-0.2.0-unsigned.ipa` を使います。個人用の開発版です。ソースコードZIPはインストールできません。
+**0.2.0のSideStore用IPAを生成し、テスト41件・実機向けビルドに成功しました。** Windows側の `release/UTubeMusic-0.2.0-unsigned.ipa` を使います。個人用の開発版です。ソースコードZIPはインストールできません。
 
 1. Windowsにある `UTubeMusic-0.2.0-unsigned.ipa` を、ご自身のiCloud Driveや普段使うファイル転送手段でiPhoneの「ファイル」アプリへ渡す。メールなどで他人へ配布する必要はありません。
 2. iPhoneをWi-Fiへ接続し、LocalDevVPNをConnectにする。
