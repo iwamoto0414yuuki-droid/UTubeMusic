@@ -28,7 +28,7 @@ def main():
     if packages.exists():
         shutil.rmtree(packages)  # fixed, project-owned generated dependency directory
     subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--require-hashes",
-                    "--only-binary=:all:", "--no-deps", "--target", str(packages),
+                    "--only-binary=:all:", "--platform", "any", "--no-deps", "--target", str(packages),
                     "-r", str(ROOT / "Python/requirements.lock")], check=True)
     notices = ["UTube Music third-party software notices", "\nPython runtime: Python Software Foundation License; bundled license follows.\n"]
     for path in sorted(vendor.glob("Python.xcframework/lib/python3.13/LICENSE*")):

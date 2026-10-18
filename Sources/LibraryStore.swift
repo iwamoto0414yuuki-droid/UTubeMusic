@@ -44,14 +44,31 @@ final class LibraryStore: ObservableObject {
         return fm.fileExists(atPath: url.path)
     }
     func save(_ song: Song, playlistID: UUID?) throws {
+        try save(song, playlistIDs: Set(playlistID.map { [$0] } ?? []))
+    }
+    func save(_ song: Song, playlistIDs: Set<UUID>) throws {
         try commit {
             if let i = songs.firstIndex(where: { $0.id == song.id }) {
                 var updated = song
                 updated.favorite = song.favorite || songs[i].favorite
                 songs[i] = updated
             } else { songs.insert(song, at: 0) }
-            if let playlistID, let i = playlists.firstIndex(where: { $0.id == playlistID }), !playlists[i].songIDs.contains(song.id) {
-                playlists[i].songIDs.append(song.id)
+            for i in playlists.indices where playlistIDs.contains(playlists[i].id) {
+                if !playlists[i].songIDs.contains(song.id) { playlists[i].songIDs.append(song.id) }
+                if let order = playlists[i].sourceOrder {
+                    let rank = Dictionary(order.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: min)
+                    playlists[i].songIDs = playlists[i].songIDs.enumerated().sorted {
+                        let left = rank[$0.element] ?? Int.max, right = rank[$1.element] ?? Int.max
+                        return left == right ? $0.offset < $1.offset : left < right
+                    }.map(\.element)
+                }
+            }
+        }
+    }
+    func setSourceOrder(_ ids: [String], sourceID: String, for playlistID: UUID) throws {
+        try commit {
+            if let i = playlists.firstIndex(where: { $0.id == playlistID }) {
+                playlists[i].sourceOrder = ids; playlists[i].sourceID = sourceID
             }
         }
     }
@@ -90,6 +107,7 @@ final class LibraryStore: ObservableObject {
             let destination = min(ids.count, max(0, to - from.filter { $0 < to }.count))
             ids.insert(contentsOf: moving, at: destination)
             playlists[i].songIDs = ids
+            playlists[i].sourceOrder = nil
         }
     }
     func delete(_ song: Song) throws {

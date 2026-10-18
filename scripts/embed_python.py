@@ -32,7 +32,8 @@ def main():
     shutil.copytree(common, app / "python/lib", dirs_exist_ok=True, ignore=ignore)
     shutil.copytree(source, app / "python/lib", dirs_exist_ok=True, ignore=ignore)
     shutil.copytree(root / "vendor/packages", app / "app", dirs_exist_ok=True, ignore=ignore)
-    shutil.copy2(root / "Python/music_engine.py", app / "app/music_engine.py")
+    for module in (root / "Python").glob("*.py"):
+        shutil.copy2(module, app / "app" / module.name)
     shutil.copy2(root / "vendor/ThirdPartyNotices.txt", app / "ThirdPartyNotices.txt")
     frameworks = app / "Frameworks"
     frameworks.mkdir(exist_ok=True)

@@ -80,6 +80,9 @@ def select_audio(info):
 def dispatch(request_json):
     try:
         request = json.loads(request_json)
+        if request.get("op") in ("home", "catalog_search", "collection"):
+            import music_catalog
+            return json.dumps(music_catalog.dispatch(request), ensure_ascii=False)
         import certifi
         from yt_dlp import YoutubeDL
         options = {"quiet": True, "no_warnings": True, "skip_download": True,
@@ -92,6 +95,8 @@ def dispatch(request_json):
             # These imports exercise the packaged native extension loader as well.
             import ssl
             import ctypes
+            from ytmusicapi import YTMusic
+            YTMusic(language="ja", location="JP")  # Constructor must work offline inside iOS.
             with YoutubeDL(options):
                 pass
             import sys
@@ -104,7 +109,11 @@ def dispatch(request_json):
         if op == "search":
             query = str(request.get("query", "")).strip()[:200]
             if not query:
-                return json.dumps({"ok": True, "songs": []})
+                return json.dumps({"ok": True, "songs": [], "has_more": False, "next_offset": 0})
+            offset = int(request.get("offset", 0))
+            if not 0 <= offset < 1000:
+                raise ValueError("検索条件を変えて、さらに曲を探してください。")
+            page_size = min(20, 1000 - offset)
             ident = None
             if "://" in query or query.startswith(("youtube.com/", "www.youtube.com/", "music.youtube.com/", "m.youtube.com/", "youtu.be/")):
                 try:
@@ -112,18 +121,30 @@ def dispatch(request_json):
                 except ValueError:
                     raise ValueError("YouTubeの曲単体のリンクを確認してください。")
             options["extract_flat"] = "in_playlist"
+            if not ident:
+                # One look-ahead item determines whether another page exists. yt-dlp
+                # consumes YouTube continuations, not an artificial first-20 limit.
+                options["playliststart"] = offset + 1
+                options["playlistend"] = offset + page_size + 1
             with YoutubeDL(options) as ydl:
-                data = ydl.extract_info("https://www.youtube.com/watch?v=" + ident if ident else "ytsearch20:" + query + " 音楽", download=False)
-            entries = data.get("entries", []) if data.get("_type") in ("playlist", "multi_video") else [data]
+                data = ydl.extract_info("https://www.youtube.com/watch?v=" + ident if ident else f"ytsearch{offset + page_size + 1}:" + query + " 音楽", download=False)
+            entries = list(data.get("entries", [])) if data.get("_type") in ("playlist", "multi_video") else [data]
+            has_more = not ident and len(entries) > page_size and offset + page_size < 1000
+            consumed = min(len(entries), page_size)
             songs = []
-            for entry in entries:
+            seen = set()
+            for entry in entries[:page_size]:
                 if not entry or entry.get("is_live"):
                     continue
                 try:
-                    songs.append(song(entry))
+                    value = song(entry)
+                    if value["id"] not in seen:
+                        songs.append(value)
+                        seen.add(value["id"])
                 except ValueError:
                     continue
-            return json.dumps({"ok": True, "songs": songs}, ensure_ascii=False)
+            return json.dumps({"ok": True, "songs": songs, "has_more": has_more,
+                               "next_offset": offset + consumed}, ensure_ascii=False)
         if op == "resolve":
             ident = video_id(str(request.get("id", "")))
             with YoutubeDL(options) as ydl:

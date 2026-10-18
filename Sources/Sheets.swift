@@ -6,8 +6,8 @@ struct SaveSongSheet: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var music: MusicService
     @Environment(\.dismiss) private var dismiss
-    @State private var favorite = false
-    @State private var playlistID: UUID?
+    @State private var favorite = true
+    @State private var playlistIDs: Set<UUID> = []
     @State private var create = false
     @State private var name = ""
     var body: some View {
@@ -21,15 +21,38 @@ struct SaveSongSheet: View {
                             Text(song.artist).font(.subheadline).foregroundStyle(Palette.secondary)
                         }
                     }
-                    VStack(spacing: 0) {
-                        Toggle(isOn: $favorite) { Label("お気に入りに追加", systemImage: "heart") }.padding(16)
-                        Divider().overlay(Palette.raised)
-                        Picker("プレイリスト", selection: $playlistID) {
-                            Text("ライブラリのみ").tag(UUID?.none)
-                            ForEach(library.playlists) { Text($0.name).tag(Optional($0.id)) }
-                        }.padding(16)
-                    }.background(Palette.surface, in: RoundedRectangle(cornerRadius: 15))
-                    Button { name = ""; create = true } label: { Label("新しいプレイリスト", systemImage: "plus.circle").font(.subheadline).frame(minHeight: 44) }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("保存した曲は「ライブラリ」にまとまります。") .font(.subheadline)
+                        Text("下で、お気に入りやプレイリストへの追加も選べます。")
+                            .font(.caption).foregroundStyle(Palette.secondary)
+                    }
+                    Toggle(isOn: $favorite) {
+                        Label("お気に入りに追加", systemImage: favorite ? "heart.fill" : "heart")
+                    }.tint(Palette.accent).padding(16).background(Palette.surface, in: RoundedRectangle(cornerRadius: 15))
+                        .accessibilityIdentifier("save-favorite")
+                    VStack(alignment: .leading, spacing: 12) {
+                        SectionTitle(title: "プレイリストにも追加", caption: "任意・複数選択できます")
+                        VStack(spacing: 0) {
+                            ForEach(library.playlists) { playlist in
+                                Button {
+                                    if playlistIDs.contains(playlist.id) { playlistIDs.remove(playlist.id) }
+                                    else { playlistIDs.insert(playlist.id) }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        PlaylistArtwork(name: playlist.name, size: 42)
+                                        Text(playlist.name).font(.subheadline).multilineTextAlignment(.leading)
+                                        Spacer(minLength: 4)
+                                        Image(systemName: playlistIDs.contains(playlist.id) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(playlistIDs.contains(playlist.id) ? Palette.accent : Palette.secondary)
+                                    }.padding(12).frame(minHeight: 56).contentShape(Rectangle())
+                                }.buttonStyle(.plain).accessibilityAddTraits(playlistIDs.contains(playlist.id) ? .isSelected : [])
+                            }
+                            Button { name = ""; create = true } label: {
+                                Label("新しいプレイリストを作成", systemImage: "plus.circle")
+                                    .font(.subheadline.bold()).frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).padding(.horizontal, 16)
+                            }.buttonStyle(.plain).foregroundStyle(Palette.accent)
+                        }.background(Palette.surface, in: RoundedRectangle(cornerRadius: 15))
+                    }
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.down.circle.fill").font(.title2).foregroundStyle(Palette.accent)
                         VStack(alignment: .leading, spacing: 5) {
@@ -37,21 +60,64 @@ struct SaveSongSheet: View {
                             Text("AAC / M4A · 保存後はオフライン再生\n保存が終わるまでアプリを開いてください。").font(.caption).foregroundStyle(Palette.secondary).lineSpacing(4)
                         }
                     }
-                    PrimaryButton(title: "曲を保存", symbol: "arrow.down") {
-                        music.save(song, favorite: favorite, playlistID: playlistID); dismiss()
-                    }.disabled(library.recoveryNeeded)
                     Text("保存する権利・許可のある曲を対象にしてください。")
                         .font(.caption2).foregroundStyle(Palette.secondary)
                 }.padding(24)
             }.background(Palette.background).foregroundStyle(Palette.text)
                 .navigationTitle("曲を保存").navigationBarTitleDisplayMode(.inline)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: 10) {
+                        Text(favorite ? "お気に入り" + (playlistIDs.isEmpty ? "に追加" : " ＋ \(playlistIDs.count)個のプレイリストに追加") : playlistIDs.isEmpty ? "このiPhoneに保存" : "\(playlistIDs.count)個のプレイリストに追加")
+                            .font(.caption).foregroundStyle(Palette.secondary)
+                        PrimaryButton(title: "曲を保存", symbol: "arrow.down") {
+                            music.save(song, favorite: favorite, playlistIDs: playlistIDs); dismiss()
+                        }.disabled(library.recoveryNeeded)
+                    }.padding(20).background(Palette.background)
+                }
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } } }
                 .alert("新しいプレイリスト", isPresented: $create) {
                     TextField("名前", text: $name)
                     Button("キャンセル", role: .cancel) {}
-                    Button("作成") { do { playlistID = try library.createPlaylist(name) } catch { library.message = error.localizedDescription } }
+                    Button("作成") { do { playlistIDs.insert(try library.createPlaylist(name)) } catch { library.message = error.localizedDescription } }
                 }
         }.appFeedback().presentationDetents([.large]).presentationDragIndicator(.visible)
+    }
+}
+
+struct BatchSaveSheet: View {
+    let title: String
+    let sourceID: String
+    let songs: [Song]
+    let onSaved: () -> Void
+    @EnvironmentObject private var music: MusicService
+    @EnvironmentObject private var library: LibraryStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var favorite = true
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    PlaylistArtwork(name: title, size: 90)
+                    Text(title).font(.title2.bold())
+                    Text("\(songs.count)曲を「\(title)」プレイリストに保存します。") .font(.subheadline)
+                    Toggle(isOn: $favorite) { Label("全曲をお気に入りにも追加", systemImage: "heart") }.tint(Palette.accent)
+                    Text("お気に入りに入れず、プレイリストだけにまとめることもできます。")
+                        .font(.caption).foregroundStyle(Palette.secondary)
+                    Text("保存済みの曲は再利用し、新しい曲は1曲ずつ保存します。途中で止めても、保存済みの曲は残ります。取得できない曲は「保存の状況」から再試行できます。")
+                        .font(.subheadline).foregroundStyle(Palette.secondary).lineSpacing(5)
+                    Text("保存が終わるまでアプリを開いてください。保存する権利・許可のある曲を対象にしてください。")
+                        .font(.caption).foregroundStyle(Palette.secondary)
+                }.padding(24)
+            }.background(Palette.background).foregroundStyle(Palette.text)
+                .navigationTitle("まとめて保存").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } } }
+                .safeAreaInset(edge: .bottom) {
+                    PrimaryButton(title: "\(songs.count)曲を保存", symbol: "arrow.down") {
+                        do { try music.saveCollection(songs, title: title, sourceID: sourceID, favorite: favorite); dismiss(); onSaved() }
+                        catch { library.message = error.localizedDescription }
+                    }.disabled(library.recoveryNeeded).padding(20).background(Palette.background)
+                }
+        }.appFeedback().presentationDragIndicator(.visible)
     }
 }
 
@@ -107,6 +173,15 @@ struct DownloadsView: View {
             ScrollView {
                 if music.jobs.isEmpty { EmptyPanel(symbol: "arrow.down.circle", title: "保存状況はここで確認", detail: "検索から曲を選んで保存できます。") }
                 LazyVStack(spacing: 16) {
+                    if !music.jobs.isEmpty {
+                        HStack {
+                            Text("\(music.jobs.filter(\.finished).count) / \(music.jobs.count)曲 保存完了").font(.subheadline.bold())
+                            Spacer()
+                            if music.jobs.contains(where: { !$0.finished && $0.error == nil }) {
+                                Button("すべて中止") { music.cancelPending() }.font(.caption).frame(minHeight: 44)
+                            }
+                        }
+                    }
                     ForEach(music.jobs) { job in
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 12) {
@@ -130,9 +205,10 @@ struct DownloadsView: View {
                                     IconButton(symbol: "xmark", label: "完了した保存を一覧から外す", size: 16) { music.dismiss(job.id) }
                                 }
                             } else {
-                                if job.fraction > 0 { ProgressView(value: job.fraction).tint(Palette.accent) } else { ProgressView().tint(Palette.accent) }
+                                if job.fraction > 0 { ProgressView(value: job.fraction).tint(Palette.accent) }
+                                else if job.phase != "保存待ち" { ProgressView().tint(Palette.accent) }
                                 HStack {
-                                    Text(job.fraction > 0 ? "\(Int(job.fraction * 100))%" : "処理中").font(.caption).foregroundStyle(Palette.secondary)
+                                    Text(job.fraction > 0 ? "\(Int(job.fraction * 100))%" : job.phase == "保存待ち" ? "順番に保存します" : "処理中").font(.caption).foregroundStyle(Palette.secondary)
                                     Spacer()
                                     Button("キャンセル") { music.cancel(job.id) }.font(.caption).frame(minHeight: 44)
                                 }
@@ -170,10 +246,10 @@ struct SettingsView: View {
                         .font(.subheadline).foregroundStyle(Palette.secondary)
                 }
                 Section {
-                    LabeledContent("バージョン", value: "0.1.0 開発版")
+                    LabeledContent("バージョン", value: "0.2.0 開発版")
                     Text("個人用の音楽ライブラリ。曲の取得はYouTubeの仕様や制限により失敗する場合があります。")
                         .font(.caption).foregroundStyle(Palette.secondary)
-                    Text("Python / yt-dlp / yt-dlp-ejs / certifi / yt-dlp-apple-webkit-jsi を使用。ライセンスはアプリ内の同梱ファイル ThirdPartyNotices を参照。")
+                    Text("Python / yt-dlp / yt-dlp-ejs / certifi / yt-dlp-apple-webkit-jsi / ytmusicapi / requests を使用。ライセンスはアプリ内の同梱ファイル ThirdPartyNotices を参照。")
                         .font(.caption).foregroundStyle(Palette.secondary)
                     if let notice = Bundle.main.url(forResource: "ThirdPartyNotices", withExtension: "txt") {
                         ShareLink("ライセンスを開く・共有", item: notice)

@@ -26,6 +26,8 @@ struct MusicPlaylist: Identifiable, Codable, Equatable {
     var name: String
     var songIDs: [String] = []
     var createdAt = Date()
+    var sourceOrder: [String]? = nil
+    var sourceID: String? = nil
 }
 
 struct LibrarySnapshot: Codable {

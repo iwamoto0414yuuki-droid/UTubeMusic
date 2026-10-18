@@ -18,6 +18,12 @@ struct EngineResponse: Decodable {
     let url: String?
     let headers: [String: String]?
     let bytes: Int64?
+    let has_more: Bool?
+    let next_offset: Int?
+    let sections: [CatalogSection]?
+    let items: [CatalogItem]?
+    let collection: CatalogItem?
+    let unavailable: Int?
 }
 
 final class PythonService {
@@ -46,45 +52,27 @@ struct SaveJob: Identifiable {
     let id: UUID
     var song: Song
     var fraction: Double = 0
-    var phase = "音声を確認中"
+    var phase = "保存待ち"
     var error: String?
     var finished = false
-    var playlistID: UUID?
+    var playlistIDs: Set<UUID> = []
 }
 
 @MainActor
 final class MusicService: ObservableObject {
-    @Published var results: [Song] = []
-    @Published var searching = false
-    @Published var searchError: String?
     @Published var jobs: [SaveJob] = []
-    private var searchGeneration = UUID()
     private var tasks: [UUID: Task<Void, Never>] = [:]
     private let engine = PythonService.shared
     let library: LibraryStore
     init(library: LibraryStore) { self.library = library }
 
-    func search(_ query: String) async {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let generation = UUID(); searchGeneration = generation
-        guard !query.isEmpty else { results = []; searching = false; searchError = nil; return }
-        searching = true; searchError = nil; results = []
-        do {
-            let response = try await engine.request(["op": "search", "query": query])
-            guard generation == searchGeneration, !Task.isCancelled else { return }
-            results = (response.songs ?? []).map(\.song)
-            searching = false
-        } catch {
-            guard generation == searchGeneration else { return }
-            searchError = error.localizedDescription; searching = false
-        }
-    }
-    func save(_ song: Song, favorite: Bool, playlistID: UUID?) {
+    func save(_ song: Song, favorite: Bool, playlistIDs: Set<UUID>) {
         if let existing = library.song(song.id), library.isAvailable(existing) {
             do {
-                if favorite && !existing.favorite { library.toggleFavorite(existing.id) }
-                if let playlistID { try library.add(existing.id, to: playlistID) }
-                library.message = "保存済みです。ライブラリから再生できます。"
+                var updated = existing
+                updated.favorite = favorite || existing.favorite
+                try library.save(updated, playlistIDs: playlistIDs)
+                library.message = "保存済みの曲に選択した追加先を反映しました。"
             } catch { library.message = error.localizedDescription }
             return
         }
@@ -94,15 +82,37 @@ final class MusicService: ObservableObject {
         }
         let id = UUID()
         var song = song; song.favorite = favorite
-        jobs.insert(SaveJob(id: id, song: song, playlistID: playlistID), at: 0)
-        tasks[id] = Task { await perform(id) }
+        jobs.append(SaveJob(id: id, song: song, playlistIDs: playlistIDs))
+        scheduleNext()
     }
-    func cancel(_ id: UUID) { tasks[id]?.cancel() }
+    func cancel(_ id: UUID) {
+        if let task = tasks[id] { task.cancel() }
+        else { update(id) { $0.error = "保存をキャンセルしました" } }
+    }
+    func cancelPending() {
+        for job in jobs where !job.finished && job.error == nil { cancel(job.id) }
+    }
+    private func scheduleNext() {
+        guard tasks.isEmpty, let job = jobs.first(where: { !$0.finished && $0.error == nil }) else { return }
+        tasks[job.id] = Task { await perform(job.id) }
+    }
+    func saveCollection(_ songs: [Song], title: String, sourceID: String, favorite: Bool) throws {
+        guard !songs.isEmpty else { throw AppFailure("保存できる曲がありません。") }
+        // Reuse only the same imported source; a user's equally named list is separate.
+        let playlistID = try library.playlists.first(where: { $0.sourceID == sourceID })?.id ?? library.createPlaylist(title)
+        try library.setSourceOrder(songs.map(\.id), sourceID: sourceID, for: playlistID)
+        for song in songs {
+            if let index = jobs.firstIndex(where: { $0.song.id == song.id && !$0.finished && $0.error == nil }) {
+                jobs[index].playlistIDs.insert(playlistID)
+                jobs[index].song.favorite = jobs[index].song.favorite || favorite
+            } else { save(song, favorite: favorite, playlistIDs: [playlistID]) }
+        }
+    }
     func dismiss(_ id: UUID) { guard tasks[id] == nil else { return }; jobs.removeAll { $0.id == id } }
     func retry(_ id: UUID) {
         guard let job = jobs.first(where: { $0.id == id }), job.error != nil else { return }
         jobs.removeAll { $0.id == id }
-        save(job.song, favorite: job.song.favorite, playlistID: job.playlistID)
+        save(job.song, favorite: job.song.favorite, playlistIDs: job.playlistIDs)
     }
     private func update(_ id: UUID, _ body: (inout SaveJob) -> Void) {
         if let i = jobs.firstIndex(where: { $0.id == id }) { body(&jobs[i]) }
@@ -119,8 +129,11 @@ final class MusicService: ObservableObject {
         defer {
             tasks[id] = nil
             if background != .invalid { UIApplication.shared.endBackgroundTask(background) }
+            scheduleNext()
         }
         do {
+            try Task.checkCancellation()
+            update(id) { $0.phase = "音声を確認中" }
             let response = try await engine.request(["op": "resolve", "id": job.song.id])
             try Task.checkCancellation()
             guard let urlString = response.url, let url = URL(string: urlString),
@@ -146,10 +159,11 @@ final class MusicService: ObservableObject {
             }
             try Task.checkCancellation()
             var song = metadata.song
-            song.favorite = job.song.favorite; song.duration = duration
+            let latest = jobs.first(where: { $0.id == id }) ?? job
+            song.favorite = latest.song.favorite; song.duration = duration
             song.fileName = fileName; song.artworkName = artworkName
             song.bytes = (try FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
-            try library.save(song, playlistID: job.playlistID)
+            try library.save(song, playlistIDs: latest.playlistIDs)
             update(id) { $0.song = song; $0.fraction = 1; $0.phase = "保存しました"; $0.finished = true }
         } catch {
             try? FileManager.default.removeItem(at: destination)

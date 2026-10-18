@@ -115,4 +115,27 @@ final class LibraryTests: XCTestCase {
         for path in ["../escape", "/tmp/escape", "..", "a\\b", ""] { XCTAssertNil(store.file(path)) }
         XCTAssertEqual(store.file("safe.m4a")?.deletingLastPathComponent().standardizedFileURL.path, store.root.standardizedFileURL.path)
     }
+    func testMultiPlaylistSaveAndAlbumOrderSurvivePartialCompletionAndReload() async throws {
+        let root = try makeRoot(), store = LibraryStore(root: root)
+        let album = try store.createPlaylist("Album"), other = try store.createPlaylist("Other")
+        try store.setSourceOrder(["a", "b", "c"], sourceID: "MPREb_album", for: album)
+        for key in ["c", "a", "b"] {
+            try store.save(Song(id: key, title: key, artist: "Artist", duration: 1, favorite: true), playlistIDs: [album, other])
+        }
+        let reloaded = LibraryStore(root: root)
+        XCTAssertEqual(reloaded.playlists.first(where: { $0.id == album })?.songIDs, ["a", "b", "c"])
+        XCTAssertEqual(reloaded.playlists.first(where: { $0.id == other })?.songIDs, ["c", "a", "b"])
+        XCTAssertEqual(reloaded.favorites.count, 3)
+        XCTAssertEqual(reloaded.playlists.first(where: { $0.id == album })?.sourceID, "MPREb_album")
+        try reloaded.move(in: album, from: IndexSet(integer: 0), to: 3)
+        XCTAssertEqual(reloaded.playlists.first(where: { $0.id == album })?.songIDs, ["b", "c", "a"])
+    }
+    func testLegacySnapshotWithoutImportFieldsStillLoads() async throws {
+        let root = try makeRoot(), id = UUID()
+        let data = try JSONSerialization.data(withJSONObject: ["version": 1, "songs": [], "playlists": [["id": id.uuidString, "name": "Old", "songIDs": [], "createdAt": 1]]])
+        try data.write(to: root.appendingPathComponent("library.json"))
+        let store = LibraryStore(root: root)
+        XCTAssertFalse(store.recoveryNeeded); XCTAssertEqual(store.playlists.first?.name, "Old")
+        XCTAssertNil(store.playlists.first?.sourceID)
+    }
 }

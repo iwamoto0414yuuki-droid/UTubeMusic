@@ -71,9 +71,37 @@ class EngineTests(unittest.TestCase):
             result = json.loads(engine.dispatch(json.dumps({"op": "search", "query": "Song"})))
             self.assertTrue(result["ok"]); self.assertEqual(len(result["songs"]), 1)
             engine.dispatch(json.dumps({"op": "search", "query": "TaylorSwift"}))
-            self.assertTrue(queries[-1].startswith("ytsearch20:TaylorSwift"))
+            self.assertTrue(queries[-1].startswith("ytsearch21:TaylorSwift"))
             error = engine.dispatch(json.dumps({"op": "search", "query": "failure"}))
             self.assertNotIn("secret", error); self.assertFalse(json.loads(error)["ok"])
+
+    def test_search_pages_use_raw_offsets_and_lookahead_even_when_entries_are_filtered(self):
+        calls = []
+        class FakeYDL:
+            def __init__(self, options): self.options = options
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def extract_info(self, query, download=False):
+                calls.append((query, self.options.copy()))
+                start = self.options.get("playliststart", 1) - 1
+                return {"_type": "playlist", "entries": [
+                    {"id": f"{i:011d}", "title": "Song", "is_live": i == 2} for i in range(start, min(start + 21, 43))]}
+        with patch.dict(sys.modules, {"yt_dlp": types.SimpleNamespace(YoutubeDL=FakeYDL), "certifi": types.SimpleNamespace(where=lambda: "ca.pem")}):
+            first = json.loads(engine.dispatch(json.dumps({"op": "search", "query": "Song"})))
+            second = json.loads(engine.dispatch(json.dumps({"op": "search", "query": "Song", "offset": "20"})))
+            last = json.loads(engine.dispatch(json.dumps({"op": "search", "query": "Song", "offset": "40"})))
+        self.assertEqual(first["next_offset"], 20); self.assertEqual(len(first["songs"]), 19)
+        self.assertTrue(first["has_more"]); self.assertTrue(second["has_more"])
+        self.assertFalse(last["has_more"]); self.assertEqual(len(last["songs"]), 3)
+        self.assertEqual(calls[1][1]["playliststart"], 21); self.assertEqual(calls[1][1]["playlistend"], 41)
+        self.assertEqual(calls[1][0], "ytsearch41:Song 音楽")
+        self.assertEqual(len({s["id"] for p in [first, second, last] for s in p["songs"]}), 42)
+
+    def test_invalid_search_offset_is_rejected(self):
+        with patch.dict(sys.modules, {"yt_dlp": types.SimpleNamespace(YoutubeDL=object), "certifi": types.SimpleNamespace(where=lambda: "ca.pem")}):
+            for offset in [-1, 1000, "bad"]:
+                result = json.loads(engine.dispatch(json.dumps({"op": "search", "query": "Song", "offset": offset})))
+                self.assertFalse(result["ok"])
 
 
 if __name__ == "__main__": unittest.main()
