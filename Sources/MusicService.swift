@@ -230,10 +230,13 @@ enum AudioTransfer {
     }
     static func parseRange(_ value: String) -> (start: Int64, end: Int64, total: Int64)? {
         guard value.hasPrefix("bytes ") else { return nil }
-        let fields = value.dropFirst(6).split(separator: "/")
-        guard fields.count == 2, let total = Int64(fields[1]) else { return nil }
-        let bounds = fields[0].split(separator: "-")
-        guard bounds.count == 2, let start = Int64(bounds[0]), let end = Int64(bounds[1]), start >= 0, end >= start else { return nil }
+        let fields = value.dropFirst(6).split(separator: "/", omittingEmptySubsequences: false)
+        guard fields.count == 2 else { return nil }
+        let bounds = fields[0].split(separator: "-", omittingEmptySubsequences: false)
+        let decimal: (Substring) -> Bool = { !$0.isEmpty && $0.utf8.allSatisfy { $0 >= 48 && $0 <= 57 } }
+        guard bounds.count == 2, decimal(bounds[0]), decimal(bounds[1]), decimal(fields[1]),
+              let start = Int64(bounds[0]), let end = Int64(bounds[1]), let total = Int64(fields[1]),
+              start >= 0, end >= start, total > end else { return nil }
         return (start, end, total)
     }
 }

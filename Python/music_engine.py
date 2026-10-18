@@ -92,9 +92,13 @@ def dispatch(request_json):
             # These imports exercise the packaged native extension loader as well.
             import ssl
             import ctypes
-            from yt_dlp_plugins.extractor.ytjsc import AppleWebKitJCP
             with YoutubeDL(options):
                 pass
+            import sys
+            # Let yt-dlp load providers once; a premature direct import double-registers them.
+            provider = sys.modules.get("yt_dlp_plugins.extractor.ytjsc")
+            if provider is None or not hasattr(provider, "AppleWebKitJCP"):
+                raise RuntimeError("The on-device JavaScript provider was not loaded")
             webkit_selftest()
             return json.dumps({"ok": True, "songs": []})
         if op == "search":

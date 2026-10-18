@@ -51,6 +51,8 @@ final class QueueTests: XCTestCase {
         XCTAssertNil(AudioTransfer.parseRange("bytes */100"))
         XCTAssertNil(AudioTransfer.parseRange("bytes 9-2/100"))
         XCTAssertNil(AudioTransfer.parseRange("bytes -1-2/100"))
+        XCTAssertNil(AudioTransfer.parseRange("bytes +1-2/100"))
+        XCTAssertNil(AudioTransfer.parseRange("bytes 0-100/100"))
         XCTAssertNil(AudioTransfer.parseRange("garbage"))
     }
 }
@@ -111,6 +113,6 @@ final class LibraryTests: XCTestCase {
     func testUntrustedFileNamesStayInsideLibrary() async throws {
         let store = LibraryStore(root: try makeRoot())
         for path in ["../escape", "/tmp/escape", "..", "a\\b", ""] { XCTAssertNil(store.file(path)) }
-        XCTAssertEqual(store.file("safe.m4a")?.deletingLastPathComponent(), store.root)
+        XCTAssertEqual(store.file("safe.m4a")?.deletingLastPathComponent().standardizedFileURL.path, store.root.standardizedFileURL.path)
     }
 }
