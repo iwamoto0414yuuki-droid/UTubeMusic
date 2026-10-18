@@ -4,7 +4,11 @@ iPhoneに曲を保存し、同じアプリでお気に入り・プレイリス�
 
 対象: iPhone 14 / 利用者申告 iOS 27.0.1。開発PC: Windows。更新日: 2026-10-19。
 
-## 現在の状態
+## 現在の状態（0.2.1）
+
+ライブラリ一覧・お気に入りの曲・保存した曲・各プレイリストに「曲を追加」を設置。新曲の検索から保存へ進み、開いていたお気に入り・プレイリストを初期選択します。お気に入り／プレイリストでは「保存した曲から」も選択可能。追加済みのチェック表示で二重登録を防ぎ、元の音声ファイルやほかのプレイリストを保持します。曲が多い一覧では末尾にも入口を表示します。**0.2.1の更新用IPAを生成しました。** [成功したビルド](https://github.com/iwamoto0414yuuki-droid/UTubeMusic/actions/runs/39141350945)。ネイティブ31件・Python16件の合計47件が成功。追加先への登録時に、ファイル・元のプレイリスト・お気に入りの状態を保持すること、追加済みの二重登録と削除済み追加先を扱うことを検証しました。新たにお気に入り詳細・プレイリスト詳細・曲の追加検索・保存した曲から追加の4画面をネイティブ画像で取得。0.2.1の新機能は更新後の実機確認が必要です。
+
+## 0.2.0までの機能と検証
 
 0.1.0は利用者のiPhone 14 / iOS 27.0.1で導入・保存・再生、プレイリスト、バックグラウンド再生、再生モードの動作確認が報告されました。期限更新用ショートカットも利用者が設定済みです。これは利用者からの報告で、開発環境から端末を直接操作しての検証ではありません。
 
@@ -34,9 +38,9 @@ GitHub公式は、公開リポジトリで標準GitHub-hosted runnerを使うAct
 2. ソースの公開について利用者の同意を得る。2026-10-18に本人の承認を得て、[UTubeMusic](https://github.com/iwamoto0414yuuki-droid/UTubeMusic) にソースのみを公開しました。曲・認証情報・既存LocalTubeのデータは含めません。
 3. Actions → `Build personal iPhone app (free standard runner)` → Run workflow。
 4. シミュレーターのビルド・ネイティブテストを通してから実機用ビルドを行う。
-5. 成功時の `UTubeMusic-0.2.0-SideStore` からIPAとSHA256を取得する。失敗はログを調べて修正し、成功するまで導入用として配布しない。
+5. 成功時の `UTubeMusic-0.2.1-SideStore` からIPAとSHA256を取得する。失敗はログを調べて修正し、成功するまで導入用として配布しない。
 
-出力: `build/UTubeMusic-0.2.0-unsigned.ipa`。Windowsへ取得した配布用コピーは `release/` に保存します。これは自分のApple AccountでSideStoreが署名する前のIPAです。署名証明書・パスワード・ペアリングファイルをCIへ送る必要はありません。成果物のActions保管期限は1日なので、取得したIPAを手元に保管してください。
+出力: `build/UTubeMusic-0.2.1-unsigned.ipa`。Windowsへ取得した配布用コピーは `release/` に保存します。これは自分のApple AccountでSideStoreが署名する前のIPAです。署名証明書・パスワード・ペアリングファイルをCIへ送る必要はありません。成果物のActions保管期限は1日なので、取得したIPAを手元に保管してください。
 
 Macがある場合はXcodeとXcodeGenを用意して `bash scripts/build_ipa.sh` で同じビルドを実行できます。Windowsでは実行できません。
 
@@ -99,3 +103,5 @@ Google Stitchもブラウザで試しましたが、追加規約の同意画面�
 - [ホーム・アルバム取得](https://ytmusicapi.readthedocs.io/en/stable/reference/browsing.html)
 
 0.2.0検証済みソース: `bbab3fc48d877682ab701917c52b59e0883bcc45`。追加の公開カタログ依存も `Python/requirements.lock` で純PythonホイールとSHA256を固定しています。
+
+0.2.1の検証済みソース: `78891ba9b0dd83b5b2ac1813dc899883cdc99f1d`。バンドルID・保存フォルダーは継続し、同じアプリへ上書きする更新用IPAです。
