@@ -23,7 +23,7 @@ struct NowPlayingView: View {
                         IconButton(symbol: "ellipsis", label: "曲のメニュー") { showActions = true }
                     }
                     if let song = player.current {
-                        SongArtwork(song: song, size: min(geo.size.width - 48, max(160, geo.size.height * 0.36), 360), radius: 16)
+                        SongArtwork(song: song, size: min(geo.size.width - 48, min(max(160, geo.size.height * 0.36), 360)), radius: 16)
                             .shadow(color: .black.opacity(0.35), radius: 30, y: 16).padding(.vertical, 6)
                         HStack(spacing: 16) {
                             VStack(alignment: .leading, spacing: 9) {
