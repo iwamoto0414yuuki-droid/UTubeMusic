@@ -36,6 +36,7 @@ jobs:
       - name: Native build and queue/library tests
         timeout-minutes: 10
         run: |
+          set -euo pipefail
           xcodebuild -project UTubeMusic.xcodeproj -scheme UTubeMusic -configuration Debug \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/simulator \
             -parallel-testing-enabled NO -test-timeouts-enabled YES \

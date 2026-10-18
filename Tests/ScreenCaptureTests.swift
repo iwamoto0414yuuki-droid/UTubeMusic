@@ -18,14 +18,21 @@ final class ScreenCaptureTests: XCTestCase {
         window.layoutIfNeeded()
         if scrollToBottom {
             func scrolls(_ view: UIView) -> [UIScrollView] {
-                (view as? UIScrollView).map { [$0] } ?? [] + view.subviews.flatMap(scrolls)
+                let own = (view as? UIScrollView).map { [$0] } ?? []
+                return own + view.subviews.flatMap(scrolls)
             }
-            let candidates = scrolls(window).filter { $0.contentSize.height > $0.bounds.height + 20 && $0.contentSize.width <= $0.bounds.width + 2 }
-            let scroll = try XCTUnwrap(candidates.max(by: { $0.contentSize.height < $1.contentSize.height }))
-            let end = max(-scroll.adjustedContentInset.top, scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
-            scroll.setContentOffset(CGPoint(x: 0, y: end), animated: false)
-            try await Task.sleep(nanoseconds: 500_000_000)
+            let candidates = scrolls(window).filter { $0.isScrollEnabled && !$0.isHidden && $0.contentSize.height > $0.bounds.height + 20 && $0.contentSize.width <= $0.bounds.width + 2 }
+            for scroll in candidates { print("Scroll candidate:", type(of: scroll), scroll.accessibilityIdentifier ?? "nil", scroll.bounds, scroll.contentSize) }
+            let scroll = try XCTUnwrap(candidates.last(where: { $0.accessibilityIdentifier == "search-scroll" }) ?? candidates.last)
+            for _ in 0..<3 {
+                window.layoutIfNeeded()
+                let end = max(-scroll.adjustedContentInset.top, scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
+                scroll.setContentOffset(CGPoint(x: 0, y: end), animated: false)
+                try await Task.sleep(nanoseconds: 250_000_000)
+            }
             window.layoutIfNeeded()
+            print("Scrolled to:", scroll.contentOffset, "size:", scroll.contentSize, "viewport:", scroll.bounds.size)
+            XCTAssertGreaterThan(scroll.contentOffset.y, 0, "The actual search scroll view must move")
         }
         inspect?(window)
         let renderer = UIGraphicsImageRenderer(bounds: window.bounds)

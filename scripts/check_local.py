@@ -32,6 +32,8 @@ def main():
     assert job["if"] == "github.event.repository.private == false"
     assert job["runs-on"] == "macos-15"
     assert "secrets" not in (ROOT / ".github/workflows/ios.yml").read_text()
+    native = next(s for s in job["steps"] if s.get("name") == "Native build and queue/library tests")
+    assert "set -euo pipefail" in native["run"], "A failing xcodebuild must stop IPA packaging"
     if failures:
         raise SystemExit("\n".join(failures))
     print("Swift syntax trees, Python syntax and workflow configuration: OK (not a native compilation)")

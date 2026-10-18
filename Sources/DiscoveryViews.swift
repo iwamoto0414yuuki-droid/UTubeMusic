@@ -6,21 +6,26 @@ struct BrowseGenres: View {
     private let symbols = ["sparkles", "moon.stars.fill", "guitars.fill", "star.fill", "play.rectangle.fill", "music.quarternote.3", "music.note", "pianokeys"]
     private let colors = [Color(red: 0.5, green: 0.2, blue: 0.28), Color(red: 0.22, green: 0.27, blue: 0.47), Color(red: 0.36, green: 0.23, blue: 0.18), Color(red: 0.37, green: 0.22, blue: 0.47)]
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            ForEach(Array(genres.enumerated()), id: \.offset) { index, genre in
-                Button { select(genre) } label: {
-                    ZStack(alignment: .bottomTrailing) {
-                        Circle().stroke(.white.opacity(0.08), lineWidth: 22).frame(width: 100, height: 100).offset(x: 22, y: 40)
-                        VStack(alignment: .leading, spacing: 20) {
-                            Text(genre).font(.headline)
-                            Image(systemName: symbols[index]).font(.system(size: 24, weight: .light)).frame(maxWidth: .infinity, alignment: .trailing)
-                        }.padding(18)
-                    }.frame(maxWidth: .infinity, minHeight: 120).foregroundStyle(Palette.text)
-                        .background(colors[index % colors.count], in: RoundedRectangle(cornerRadius: 14)).clipShape(RoundedRectangle(cornerRadius: 14))
-                }.buttonStyle(.plain).accessibilityIdentifier("genre-\(index)")
-                    .background { GeometryReader { geo in Color.clear.preference(key: PlayerLayoutFrames.self, value: ["genre-\(index)": geo.frame(in: .named("player-layout"))]) } }
+        // Eight browse cards fit an eager grid; their true full height is known
+        // before scrolling, including when the player reduces the viewport.
+        VStack(spacing: 12) {
+            ForEach(0..<4) { row in
+                HStack(spacing: 12) { card(row * 2); card(row * 2 + 1) }
             }
         }
+    }
+    private func card(_ index: Int) -> some View {
+        Button { select(genres[index]) } label: {
+            ZStack(alignment: .bottomTrailing) {
+                Circle().stroke(.white.opacity(0.08), lineWidth: 22).frame(width: 100, height: 100).offset(x: 22, y: 40)
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(genres[index]).font(.headline)
+                    Image(systemName: symbols[index]).font(.system(size: 24, weight: .light)).frame(maxWidth: .infinity, alignment: .trailing)
+                }.padding(18)
+            }.frame(maxWidth: .infinity, minHeight: 120).foregroundStyle(Palette.text)
+                .background(colors[index % colors.count], in: RoundedRectangle(cornerRadius: 14)).clipShape(RoundedRectangle(cornerRadius: 14))
+        }.buttonStyle(.plain).accessibilityIdentifier("genre-\(index)")
+            .background { GeometryReader { geo in Color.clear.preference(key: PlayerLayoutFrames.self, value: ["genre-\(index)": geo.frame(in: .named("player-layout"))]) } }
     }
 }
 
