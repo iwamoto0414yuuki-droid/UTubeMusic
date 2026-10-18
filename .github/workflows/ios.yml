@@ -42,7 +42,11 @@ jobs:
             -default-test-execution-time-allowance 60 -maximum-test-execution-time-allowance 120 \
             CODE_SIGNING_ALLOWED=NO test 2>&1 | tee build/native-tests.log
       - name: Capture running native home screen
+        timeout-minutes: 4
         run: |
+          xcrun simctl boot "$SIMULATOR_ID" || true
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          xcrun simctl install "$SIMULATOR_ID" build/simulator/Build/Products/Debug-iphonesimulator/UTubeMusic.app
           xcrun simctl launch "$SIMULATOR_ID" local.utubemusic.player
           sleep 3
           xcrun simctl io "$SIMULATOR_ID" screenshot build/native-home.png
@@ -55,6 +59,7 @@ jobs:
             build/UTubeMusic-0.1.0-unsigned.ipa
             build/UTubeMusic-0.1.0-unsigned.ipa.sha256
             build/native-home.png
+            build/native-tests.log
           retention-days: 1
           if-no-files-found: error
       - name: Build logs
