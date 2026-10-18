@@ -38,7 +38,12 @@ jobs:
           xcodebuild -project UTubeMusic.xcodeproj -scheme UTubeMusic -configuration Debug \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" -derivedDataPath build/simulator \
             -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test >build/native-tests.log 2>&1 \
-            || { tail -150 build/native-tests.log; exit 1; }
+            || { grep -n -A4 -B2 'error:' build/native-tests.log || true; tail -100 build/native-tests.log; exit 1; }
+      - name: Capture running native home screen
+        run: |
+          xcrun simctl launch "$SIMULATOR_ID" local.utubemusic.player
+          sleep 3
+          xcrun simctl io "$SIMULATOR_ID" screenshot build/native-home.png
       - name: Build SideStore IPA
         run: bash scripts/build_ipa.sh
       - uses: actions/upload-artifact@v4
@@ -47,6 +52,7 @@ jobs:
           path: |
             build/UTubeMusic-0.1.0-unsigned.ipa
             build/UTubeMusic-0.1.0-unsigned.ipa.sha256
+            build/native-home.png
           retention-days: 1
           if-no-files-found: error
       - name: Build logs

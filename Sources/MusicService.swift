@@ -29,10 +29,10 @@ final class PythonService {
         return try await withCheckedThrowingContinuation { continuation in
             worker.async {
                 do {
-                    guard let path = Bundle.main.resourcePath,
-                          let output = try MusicPythonBridge.call(text, resourcePath: path) else {
+                    guard let path = Bundle.main.resourcePath else {
                         throw AppFailure("音声取得エンジンを読み込めません。")
                     }
+                    let output = try MusicPythonBridge.call(text, resourcePath: path)
                     let response = try JSONDecoder().decode(EngineResponse.self, from: Data(output.utf8))
                     guard response.ok else { throw AppFailure(response.error ?? "曲を取得できませんでした。") }
                     continuation.resume(returning: response)
