@@ -1,0 +1,75 @@
+import importlib.util
+import json
+from pathlib import Path
+import sys
+import types
+import unittest
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location("music_engine", Path(__file__).resolve().parents[1] / "Python/music_engine.py")
+engine = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(engine)
+ID = "AbCdEf123_-"
+
+
+class EngineTests(unittest.TestCase):
+    def test_youtube_and_music_links(self):
+        for value in [ID, "youtu.be/" + ID, "https://music.youtube.com/watch?v=" + ID,
+                      "https://www.youtube.com/watch?v=" + ID + "&list=anything", "https://youtube.com/shorts/" + ID]:
+            with self.subTest(value=value): self.assertEqual(engine.video_id(value), ID)
+
+    def test_reject_lookalike_hosts_and_unsupported_urls(self):
+        for value in ["https://youtube.com.evil.example/watch?v=" + ID, "https://evil.example/" + ID,
+                      "https://youtube.com@evil.example/watch?v=" + ID, "file:///etc/passwd",
+                      "https://youtube.com/playlist?list=123", "https://youtube.com/watch?v=short"]:
+            with self.subTest(value=value), self.assertRaises(ValueError): engine.video_id(value)
+
+    def format(self, **values):
+        return {"vcodec": "none", "acodec": "mp4a.40.2", "ext": "m4a", "protocol": "https",
+                "url": "https://r1.googlevideo.com/videoplayback?expire=123", "abr": 128, **values}
+
+    def info(self, formats):
+        return {"id": ID, "title": "Song", "uploader": "Artist", "duration": 180, "formats": formats}
+
+    def test_choose_aac_only_and_keep_audio_metadata(self):
+        formats = [self.format(abr=64), self.format(abr=128), self.format(ext="webm", acodec="opus", abr=160),
+                   self.format(vcodec="avc1", abr=999)]
+        output = engine.select_audio(self.info(formats))
+        self.assertEqual(output["bitrate"], 128)
+        self.assertEqual(output["song"]["artist"], "Artist")
+
+    def test_no_fake_m4a_for_unsupported_format(self):
+        for fmt in [self.format(ext="webm", acodec="opus"), self.format(protocol="m3u8_native"), self.format(has_drm=True), self.format(vcodec="h264")]:
+            with self.subTest(fmt=fmt), self.assertRaises(ValueError): engine.select_audio(self.info([fmt]))
+
+    def test_source_and_header_validation(self):
+        for url in ["http://r1.googlevideo.com/a", "https://googlevideo.com.evil.example/a", "https://evil.example/a"]:
+            with self.subTest(url=url), self.assertRaises(ValueError): engine.select_audio(self.info([self.format(url=url)]))
+        info = self.info([self.format(http_headers={"User-Agent": "test", "Cookie": "secret", "Authorization": "secret"})])
+        result = engine.select_audio(info)
+        self.assertEqual(result["headers"], {"User-Agent": "test"})
+
+    def test_live_is_rejected(self):
+        for flag in [{"is_live": True}, {"live_status": "is_upcoming"}]:
+            with self.subTest(flag=flag), self.assertRaises(ValueError): engine.select_audio({**self.info([self.format()]), **flag})
+
+    def test_prefers_music_metadata(self):
+        song = engine.song({"id": ID, "title": "Uploaded title", "track": "Song title", "artist": "Artist", "uploader": "Channel", "duration": None})
+        self.assertEqual(song["title"], "Song title"); self.assertEqual(song["artist"], "Artist"); self.assertEqual(song["duration"], 0)
+
+    def test_search_contract_and_error_does_not_leak_tokens(self):
+        class FakeYDL:
+            def __init__(self, options): pass
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def extract_info(self, query, download=False):
+                if "failure" in query: raise RuntimeError("secret token=abc media URL")
+                return {"_type": "playlist", "entries": [{"id": ID, "title": "Song", "duration": 15}, None, {"id": "bad"}]}
+        with patch.dict(sys.modules, {"yt_dlp": types.SimpleNamespace(YoutubeDL=FakeYDL), "certifi": types.SimpleNamespace(where=lambda: "ca.pem")}):
+            result = json.loads(engine.dispatch(json.dumps({"op": "search", "query": "Song"})))
+            self.assertTrue(result["ok"]); self.assertEqual(len(result["songs"]), 1)
+            error = engine.dispatch(json.dumps({"op": "search", "query": "failure"}))
+            self.assertNotIn("secret", error); self.assertFalse(json.loads(error)["ok"])
+
+
+if __name__ == "__main__": unittest.main()
