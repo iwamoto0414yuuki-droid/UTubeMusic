@@ -6,7 +6,9 @@ iPhoneに曲を保存し、同じアプリでお気に入り・プレイリス�
 
 ## 現在の状態
 
-ネイティブアプリの初期ソースと、無料のmacOSビルド用ワークフローを作成しました。**まだXcodeでコンパイル・iPhone実機検証を実施しておらず、インストール用IPAはありません。** この段階を完成品として扱わないでください。
+**0.1.0のSideStore用IPAを生成しました。** 公開リポジトリの標準macOSランナーで、Xcodeのシミュレーター検証・実機向けARM64ビルドに成功しました。[成功したビルドと成果物](https://github.com/iwamoto0414yuuki-droid/UTubeMusic/actions/runs/39120755839)。Pythonの8件とネイティブの13件、合計21件のテストに通っています。
+
+**iPhone 14 / iOS 27.0.1の実機での導入・YouTubeからの保存・ロック中再生はまだ未確認の試作版です。** シミュレーターでの検証と実機での利用実績を区別してください。最初に[Windowsからの導入手順](INSTALL_IPHONE.md)に沿って1曲で確認します。
 
 - SwiftUI: ホーム / 検索 / ライブラリ、常設ミニプレイヤー、全面再生画面。
 - 端末内の組み込みCPython + yt-dlp: 曲・アーティスト検索、曲URL、AAC音声の取得情報解析。
@@ -26,12 +28,12 @@ GitHub公式は、公開リポジトリで標準GitHub-hosted runnerを使うAct
 手動実行のみ、同時1件、最大30分。成果物の保持は1日、キャッシュは使いません。Actions / Packagesの保存枠も共有されるため、他のリポジトリを含めたアカウント全体の保存量と請求設定を実行前に確認します。今回の設定だけでアカウント全体の課金設定を変更することはできません。無料を条件として、枠超過で課金する設定にはしません。
 
 1. このフォルダーだけを新しいリポジトリのルートに置く。既存LocalTubeや親フォルダー全体をアップロードしない。
-2. ソースの公開について利用者の同意を得る。2026-10-18に本人の承認を得て、[UTubeMusic](https://github.com/iwamoto0414yuuki-droid/UTubeMusic) にソースのみを公開します。曲・認証情報・既存LocalTubeのデータは含めません。
+2. ソースの公開について利用者の同意を得る。2026-10-18に本人の承認を得て、[UTubeMusic](https://github.com/iwamoto0414yuuki-droid/UTubeMusic) にソースのみを公開しました。曲・認証情報・既存LocalTubeのデータは含めません。
 3. Actions → `Build personal iPhone app (free standard runner)` → Run workflow。
 4. シミュレーターのビルド・ネイティブテストを通してから実機用ビルドを行う。
 5. 成功時の `UTubeMusic-0.1.0-SideStore` からIPAとSHA256を取得する。失敗はログを調べて修正し、成功するまで導入用として配布しない。
 
-出力予定: `build/UTubeMusic-0.1.0-unsigned.ipa`。これは自分のApple AccountでSideStoreが署名する前のIPAです。署名証明書・パスワード・ペアリングファイルをCIへ送る必要はありません。
+出力: `build/UTubeMusic-0.1.0-unsigned.ipa`。Windowsへ取得した配布用コピーは `release/` に保存します。これは自分のApple AccountでSideStoreが署名する前のIPAです。署名証明書・パスワード・ペアリングファイルをCIへ送る必要はありません。成果物のActions保管期限は1日なので、取得したIPAを手元に保管してください。
 
 Macがある場合はXcodeとXcodeGenを用意して `bash scripts/build_ipa.sh` で同じビルドを実行できます。Windowsでは実行できません。
 
@@ -61,7 +63,7 @@ Windowsで実施済み: 抽出契約のオフラインユニットテスト8件�
 python -m unittest discover -s tests_python -v
 ```
 
-`Tests/CoreTests.swift` はキュー・シャッフル・リピート、削除/再保存、索引破損・書込失敗の保護、プレイリストの順序、ファイル名・転送範囲を検証します。**まだ実行していません。** macOS CIで実行します。
+macOS CIで `Tests/CoreTests.swift` と `Tests/ScreenCaptureTests.swift` の**13件に通っています**。組み込みPython・SSL・ctypes・WebKitプロバイダーの読み込みと端末内JavaScript実行、キュー・シャッフル・リピート、削除/再保存、索引破損・書込失敗の保護、プレイリストの順序、ファイル名・転送範囲を検証しました。スクリーンショットの再生画面はテスト用に生成した無音ファイルを使用し、音楽ファイルは配布物へ同梱していません。YouTubeとの実通信や実機のバックグラウンド再生までテストしたことにはなりません。
 
 実機で必要な確認:
 
@@ -74,6 +76,8 @@ python -m unittest discover -s tests_python -v
 ## デザイン
 
 `design/index.html` はサンプルデータの操作可能なレイアウト確認用です。実際の音楽取得・再生は行いません。ネイティブ画面と細部は異なります。`node design/serve.mjs` で `http://127.0.0.1:8876/` を開けます。主要操作は44pt以上、下部3タブ、上にミニプレイヤー、全面再生画面の中央に大きい再生ボタンを置きます。色はチャコール・アイボリー・コーラル。
+
+ネイティブのホーム・再生画面もシミュレーター上のテストで描画し、画像を成果物へ保存します。再生画面は画面の高さに合わせてジャケットサイズ・余白を変えます。実機の文字サイズ変更・VoiceOver・キーボード操作は引き続き確認が必要です。
 
 Google Stitchもブラウザで試しましたが、追加規約の同意画面で停止し、デザイン生成は実施していません。Stitchの生成物を使ったとは扱いません。
 
