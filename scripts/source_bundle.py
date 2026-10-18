@@ -12,7 +12,7 @@ EXTENSIONS = {".swift", ".m", ".h", ".py", ".yml", ".lock", ".html", ".mjs", ".s
 def main():
     build = ROOT / "build"
     build.mkdir(exist_ok=True)
-    output = build / "UTubeMusic-0.2.0-source.zip"
+    output = build / "UTubeMusic-0.2.1-source.zip"
     paths = []
     candidates = [ROOT / name for name in ROOT_FILES]
     for folder in ALLOWED:

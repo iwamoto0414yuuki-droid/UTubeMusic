@@ -29,6 +29,7 @@ struct LibraryView: View {
                         TextField("保存した曲を検索", text: $text).font(.subheadline).autocorrectionDisabled()
                     }.padding(14).background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
                 }
+                AddSongsLink(destination: filter == 1 ? .favorites : .library)
                 if filter == 0 && text.isEmpty || filter == 2 {
                     NavigationLink { CollectionView(favorites: true) } label: {
                         HStack(spacing: 14) {
@@ -111,8 +112,10 @@ struct CollectionView: View {
                     PrimaryButton(title: "再生", symbol: "play.fill") { if let first = songs.first { player.start(songs, at: first) } }
                     IconButton(symbol: "shuffle", label: "シャッフル再生", color: Palette.accent) { if let song = songs.randomElement() { player.start(songs, at: song, shuffle: true) } }
                 }.disabled(songs.isEmpty)
-                if songs.isEmpty { EmptyPanel(symbol: "heart", title: "好きな曲にハートを。", detail: "曲のメニューや再生画面から追加できます。") }
+                AddSongsLink(destination: favorites ? .favorites : .library)
+                if songs.isEmpty { EmptyPanel(symbol: "heart", title: "好きな曲にハートを。", detail: "「曲を追加」から新しい曲を探せます。") }
                 ForEach(songs) { song in SongRow(song: song) { player.start(songs, at: song) } more: { selected = song } }
+                if songs.count > 5 { AddSongsLink(destination: favorites ? .favorites : .library) }
             }.padding(20)
         }.background(Palette.background).foregroundStyle(Palette.text)
             .toolbar(.visible, for: .navigationBar).toolbarBackground(Palette.background, for: .navigationBar)
@@ -143,9 +146,10 @@ struct PlaylistDetailView: View {
                         PrimaryButton(title: "再生", symbol: "play.fill") { if let song = songs.first { player.start(songs, at: song) } }
                         IconButton(symbol: "shuffle", label: "シャッフル再生", color: Palette.accent) { if let song = songs.randomElement() { player.start(songs, at: song, shuffle: true) } }
                     }.disabled(songs.isEmpty)
+                    AddSongsLink(destination: .playlist(playlistID))
                 }.listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 20, trailing: 20)).listRowBackground(Color.clear).listRowSeparator(.hidden)
                 if songs.isEmpty {
-                    EmptyPanel(symbol: "music.note", title: "このプレイリストに曲を。", detail: "検索で保存するときや、保存した曲のメニューから追加できます。")
+                    EmptyPanel(symbol: "music.note", title: "このプレイリストに曲を。", detail: "「曲を追加」から検索・保存した曲の追加ができます。")
                         .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
                 ForEach(songs) { song in
@@ -158,6 +162,10 @@ struct PlaylistDetailView: View {
                         }
                 }.onMove { source, destination in
                     do { try library.move(in: playlistID, from: source, to: destination) } catch { library.message = error.localizedDescription }
+                }
+                if songs.count > 5 {
+                    AddSongsLink(destination: .playlist(playlistID))
+                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
             }
         }.listStyle(.plain).scrollContentBackground(.hidden).background(Palette.background).foregroundStyle(Palette.text)

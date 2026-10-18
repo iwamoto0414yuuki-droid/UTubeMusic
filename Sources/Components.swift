@@ -99,6 +99,7 @@ struct SongRow: View {
     let song: Song
     var subtitle: String? = nil
     var trailing = "ellipsis"
+    var trailingLabel: String? = nil
     let action: () -> Void
     let more: () -> Void
     @EnvironmentObject private var player: PlayerStore
@@ -114,7 +115,7 @@ struct SongRow: View {
                     Spacer(minLength: 0)
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
-            IconButton(symbol: trailing, label: trailing == "arrow.down.circle" ? "\(song.title)を保存" : "\(song.title)のメニュー", action: more)
+            IconButton(symbol: trailing, label: trailingLabel ?? (trailing == "arrow.down.circle" ? "\(song.title)を保存" : "\(song.title)のメニュー"), action: more)
         }.padding(.vertical, 6)
     }
 }

@@ -83,6 +83,7 @@ struct SearchMoreButton: View {
 }
 struct SongSearchResults: View {
     @ObservedObject var search: SongSearchStore
+    var destination: SongAddDestination? = nil
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var player: PlayerStore
     @State private var save: Song?
@@ -95,9 +96,13 @@ struct SongSearchResults: View {
                 ForEach(search.results) { song in
                     let existing = library.song(song.id)
                     let available = existing.map(library.isAvailable) ?? false
+                    if let destination, let existing, available {
+                        DestinationSongRow(song: existing, destination: destination)
+                    } else {
                     SongRow(song: song, subtitle: song.artist + (song.duration > 0 ? " · " + song.timeLabel : ""), trailing: available ? "ellipsis" : "arrow.down.circle") {
                         if let existing, available { player.start([existing], at: existing) } else { save = song }
                     } more: { if let existing, available { menu = existing } else { save = song } }
+                    }
                 }
                 if search.hasMore {
                     SearchMoreButton(loading: search.loadingMore, error: search.moreError) { Task { await search.loadMore() } }
@@ -105,7 +110,7 @@ struct SongSearchResults: View {
                     EmptyPanel(symbol: "music.magnifyingglass", title: "曲が見つかりませんでした", detail: "別の曲名やアーティストで探してみてください。")
                 } else { Text("ここまで\(search.results.count)曲を表示").font(.caption).foregroundStyle(Palette.secondary).padding(.vertical, 22) }
             }
-        }.sheet(item: $save) { SaveSongSheet(song: $0) }.sheet(item: $menu) { SongActionsSheet(song: $0) }
+        }.sheet(item: $save) { SaveSongSheet(song: $0, initialPlaylistIDs: destination?.initialPlaylistIDs ?? []) }.sheet(item: $menu) { SongActionsSheet(song: $0) }
     }
 }
 struct CatalogSearchResults: View {

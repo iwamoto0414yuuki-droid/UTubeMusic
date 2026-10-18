@@ -142,4 +142,27 @@ final class ScreenCaptureTests: XCTestCase {
         defer { player.pause() }
         try await render(BatchSaveSheet(title: "Piano Collection", sourceID: "MPREb_preview", songs: [song], onSaved: {}).environmentObject(library).environmentObject(player).environmentObject(music), name: "native-batch-save")
     }
+    func testCaptureFavoritesAddButton() async throws {
+        let (library, player, music, _) = try playableLibrary()
+        defer { player.pause() }
+        try await render(NavigationStack { CollectionView(favorites: true) }.environmentObject(library).environmentObject(player).environmentObject(music), name: "native-favorites-add")
+    }
+    func testCapturePlaylistAddButton() async throws {
+        let (library, player, music, _) = try playableLibrary()
+        defer { player.pause() }
+        let playlist = try XCTUnwrap(library.playlists.first)
+        try await render(NavigationStack { PlaylistDetailView(playlistID: playlist.id) }.environmentObject(library).environmentObject(player).environmentObject(music), name: "native-playlist-add")
+    }
+    func testCaptureAddSearchWithDestination() async throws {
+        let (library, player, music, _) = try playableLibrary()
+        defer { player.pause() }
+        let playlist = try XCTUnwrap(library.playlists.first)
+        try await render(NavigationStack { AddSongsView(destination: .playlist(playlist.id)) }.environmentObject(library).environmentObject(player).environmentObject(music), name: "native-add-search")
+    }
+    func testCaptureAddSavedSongs() async throws {
+        let (library, player, music, _) = try playableLibrary()
+        defer { player.pause() }
+        let target = try library.createPlaylist("通学のおとも")
+        try await render(NavigationStack { AddSongsView(destination: .playlist(target), initialMode: 1) }.environmentObject(library).environmentObject(player).environmentObject(music), name: "native-add-saved")
+    }
 }

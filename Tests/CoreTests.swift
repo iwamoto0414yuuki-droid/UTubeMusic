@@ -138,4 +138,31 @@ final class LibraryTests: XCTestCase {
         XCTAssertFalse(store.recoveryNeeded); XCTAssertEqual(store.playlists.first?.name, "Old")
         XCTAssertNil(store.playlists.first?.sourceID)
     }
+    func testAddingSavedSongsFromCollectionsPreservesFilesAndOtherMemberships() async throws {
+        let root = try makeRoot(), store = LibraryStore(root: root)
+        let first = try store.createPlaylist("First"), second = try store.createPlaylist("Second")
+        let file = root.appendingPathComponent("saved.m4a")
+        let original = Data([1, 2, 3]); try original.write(to: file)
+        let song = Song(id: "saved", title: "Saved", artist: "Artist", duration: 1, fileName: file.lastPathComponent)
+        try store.save(song, playlistID: first)
+        try SongAddDestination.favorites.add(song, to: store)
+        try SongAddDestination.playlist(second).add(song, to: store)
+        try SongAddDestination.playlist(second).add(song, to: store)
+        let reloaded = LibraryStore(root: root)
+        XCTAssertEqual(reloaded.songs.count, 1); XCTAssertTrue(reloaded.song(song.id)?.favorite == true)
+        for id in [first, second] { XCTAssertEqual(reloaded.playlists.first(where: { $0.id == id })?.songIDs, [song.id]) }
+        XCTAssertEqual(try Data(contentsOf: file), original)
+    }
+    func testDeletedAddDestinationAndMissingAudioFailWithoutChangingLibrary() async throws {
+        let root = try makeRoot(), store = LibraryStore(root: root)
+        let file = root.appendingPathComponent("saved.m4a")
+        try Data([1]).write(to: file)
+        let song = Song(id: "saved", title: "Saved", artist: "Artist", duration: 1, fileName: file.lastPathComponent)
+        try store.save(song, playlistID: nil)
+        let before = try Data(contentsOf: root.appendingPathComponent("library.json"))
+        XCTAssertThrowsError(try SongAddDestination.playlist(UUID()).add(song, to: store))
+        try FileManager.default.removeItem(at: file)
+        XCTAssertThrowsError(try SongAddDestination.favorites.add(song, to: store))
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("library.json")), before)
+    }
 }

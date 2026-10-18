@@ -10,6 +10,11 @@ struct SaveSongSheet: View {
     @State private var playlistIDs: Set<UUID> = []
     @State private var create = false
     @State private var name = ""
+    init(song: Song, initialFavorite: Bool = true, initialPlaylistIDs: Set<UUID> = []) {
+        self.song = song
+        _favorite = State(initialValue: initialFavorite)
+        _playlistIDs = State(initialValue: initialPlaylistIDs)
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -246,7 +251,7 @@ struct SettingsView: View {
                         .font(.subheadline).foregroundStyle(Palette.secondary)
                 }
                 Section {
-                    LabeledContent("バージョン", value: "0.2.0 開発版")
+                    LabeledContent("バージョン", value: "0.2.1 開発版")
                     Text("個人用の音楽ライブラリ。曲の取得はYouTubeの仕様や制限により失敗する場合があります。")
                         .font(.caption).foregroundStyle(Palette.secondary)
                     Text("Python / yt-dlp / yt-dlp-ejs / certifi / yt-dlp-apple-webkit-jsi / ytmusicapi / requests を使用。ライセンスはアプリ内の同梱ファイル ThirdPartyNotices を参照。")
