@@ -13,6 +13,7 @@ struct RootView: View {
     @State private var showSettings = false
     @State private var saveSong: Song?
     @State private var menuSong: Song?
+    @State private var handledPreview = false
 
     var body: some View {
         NavigationStack {
@@ -34,6 +35,17 @@ struct RootView: View {
         .sheet(isPresented: $showSettings) { SettingsView() }
         .fullScreenCover(isPresented: $showPlayer) { NowPlayingView() }
         .appFeedback()
+        .task {
+            #if DEBUG
+            // CI uses a silent, generated test file in an isolated simulator container.
+            // This route and its sample library are absent from the release app.
+            if !handledPreview, ProcessInfo.processInfo.arguments.contains("--preview-player"), let song = library.songs.first {
+                handledPreview = true
+                player.start(library.songs, at: song)
+                showPlayer = true
+            }
+            #endif
+        }
         .onOpenURL { url in
             guard url.scheme == "utubemusic", let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
                   let value = components.queryItems?.first(where: { $0.name == "url" })?.value else { return }

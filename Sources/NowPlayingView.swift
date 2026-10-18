@@ -11,7 +11,7 @@ struct NowPlayingView: View {
     var body: some View {
         GeometryReader { geo in
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 14) {
                     HStack {
                         IconButton(symbol: "chevron.down", label: "再生画面を閉じる") { dismiss() }
                         Spacer()
@@ -23,12 +23,12 @@ struct NowPlayingView: View {
                         IconButton(symbol: "ellipsis", label: "曲のメニュー") { showActions = true }
                     }
                     if let song = player.current {
-                        SongArtwork(song: song, size: min(geo.size.width - 48, 360), radius: 16)
-                            .shadow(color: .black.opacity(0.35), radius: 30, y: 16).padding(.vertical, 18)
+                        SongArtwork(song: song, size: min(geo.size.width - 48, max(160, geo.size.height * 0.36), 360), radius: 16)
+                            .shadow(color: .black.opacity(0.35), radius: 30, y: 16).padding(.vertical, 6)
                         HStack(spacing: 16) {
                             VStack(alignment: .leading, spacing: 9) {
-                                Text(song.title).font(.system(size: 25, weight: .bold)).tracking(-0.7).lineLimit(3)
-                                Text(song.artist).font(.subheadline).foregroundStyle(Palette.secondary).lineLimit(2)
+                                Text(song.title).font(.system(size: 25, weight: .bold)).tracking(-0.7).lineLimit(2)
+                                Text(song.artist).font(.subheadline).foregroundStyle(Palette.secondary).lineLimit(1)
                             }.frame(maxWidth: .infinity, alignment: .leading)
                             let favorite = library.song(song.id)?.favorite == true
                             IconButton(symbol: favorite ? "heart.fill" : "heart", label: favorite ? "お気に入りから外す" : "お気に入りに追加", color: favorite ? Palette.accent : Palette.text, size: 24) { library.toggleFavorite(song.id) }
@@ -61,11 +61,11 @@ struct NowPlayingView: View {
                             Label("オフラインで再生", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(Palette.secondary)
                             Spacer()
                             IconButton(symbol: "list.bullet", label: "再生キュー") { showQueue = true }
-                        }.padding(.top, 12)
+                        }.padding(.top, 4)
                     } else {
                         EmptyPanel(symbol: "music.note", title: "再生する曲を選んでください", detail: "保存した曲をライブラリから選べます。")
                     }
-                }.padding(.horizontal, 24).padding(.bottom, 28)
+                }.padding(.horizontal, 24).padding(.bottom, 20)
             }.scrollIndicators(.hidden)
         }.foregroundStyle(Palette.text)
             .background(LinearGradient(colors: [Color(red: 0.27, green: 0.19, blue: 0.22), Palette.background, Palette.background], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea())

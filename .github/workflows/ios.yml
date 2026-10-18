@@ -50,6 +50,12 @@ jobs:
           xcrun simctl launch "$SIMULATOR_ID" local.utubemusic.player
           sleep 3
           xcrun simctl io "$SIMULATOR_ID" screenshot build/native-home.png
+          xcrun simctl terminate "$SIMULATOR_ID" local.utubemusic.player
+          APP_CONTAINER=$(xcrun simctl get_app_container "$SIMULATOR_ID" local.utubemusic.player data)
+          python3 scripts/simulator_fixture.py "$APP_CONTAINER/Documents/UTubeMusic"
+          xcrun simctl launch "$SIMULATOR_ID" local.utubemusic.player --preview-player
+          sleep 3
+          xcrun simctl io "$SIMULATOR_ID" screenshot build/native-player.png
       - name: Build SideStore IPA
         run: bash scripts/build_ipa.sh
       - uses: actions/upload-artifact@v4
@@ -59,6 +65,7 @@ jobs:
             build/UTubeMusic-0.1.0-unsigned.ipa
             build/UTubeMusic-0.1.0-unsigned.ipa.sha256
             build/native-home.png
+            build/native-player.png
             build/native-tests.log
           retention-days: 1
           if-no-files-found: error
