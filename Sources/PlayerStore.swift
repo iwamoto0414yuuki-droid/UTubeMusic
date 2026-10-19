@@ -14,6 +14,7 @@ final class PlayerStore: ObservableObject {
     private let library: LibraryStore
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
+    private var durationTask: Task<Void, Never>?
     private var notifications: [NSObjectProtocol] = []
     private var resumeAfterInterruption = false
     private var artwork: MPMediaItemArtwork?
@@ -115,17 +116,44 @@ final class PlayerStore: ObservableObject {
         }
     }
     func refreshAfterAudioRepair() {
-        guard let current, let updated = library.song(current.id), updated.fileName != current.fileName else { return }
+        guard let current, let updated = library.song(current.id),
+              updated.fileName != current.fileName || updated.duration != current.duration else { return }
         let position = elapsed, wasPlaying = playing
         load(updated, autoplay: wasPlaying)
         seek(min(position, updated.duration))
     }
     private func load(_ song: Song, autoplay: Bool = true) {
+        let song = library.song(song.id) ?? song
         guard let url = library.file(song.fileName), library.isAvailable(song) else { error = "音声ファイルが見つかりません。"; return }
         statusObservation = nil
+        durationTask?.cancel()
         player.pause()
         let item = AVPlayerItem(url: url)
         current = song; elapsed = 0; duration = song.duration
+        if song.audioFileVersion == 1, duration.isFinite, duration > 0 {
+            item.forwardPlaybackEndTime = CMTime(seconds: duration, preferredTimescale: 44100)
+        } else {
+            durationTask = Task { [weak self, weak item] in
+                do {
+                    let timing = try await AudioTiming.read(url)
+                    try Task.checkCancellation()
+                    guard let self, let item, self.player.currentItem === item, self.current?.id == song.id else { return }
+                    self.duration = timing.duration
+                    self.current?.duration = timing.duration
+                    item.forwardPlaybackEndTime = CMTime(seconds: timing.duration, preferredTimescale: 44100)
+                    if let fileName = song.fileName {
+                        do { try self.library.updateAudioDuration(song.id, expectedFileName: fileName,
+                                                                  duration: timing.duration, verified: !timing.needsRemux) }
+                        catch { self.library.message = error.localizedDescription }
+                    }
+                    self.updateNowPlaying()
+                } catch is CancellationError { }
+                catch {
+                    guard let self, let item, self.player.currentItem === item else { return }
+                    self.pause(); self.error = error.localizedDescription
+                }
+            }
+        }
         artwork = nil
         if let url = library.file(song.artworkName), let image = UIImage(contentsOfFile: url.path) {
             artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }

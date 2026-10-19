@@ -110,7 +110,8 @@ final class AudioNormalizationTests: XCTestCase {
     @MainActor
     func testRepairPreservesFavoritesPlaylistsOrderAndSurvivesReload() async throws {
         let folder = try root(), store = LibraryStore(root: folder)
-        let source = try fixture("dash_nonzero_headers", in: folder)
+        let source = try fixture("regular", in: folder)
+        let original = try Data(contentsOf: source)
         let first = try store.createPlaylist("First"), second = try store.createPlaylist("Second")
         let song = Song(id: "AbCdEf123_-", title: "Saved", artist: "Artist", duration: 6,
                         fileName: source.lastPathComponent, favorite: true)
@@ -122,8 +123,8 @@ final class AudioNormalizationTests: XCTestCase {
         XCTAssertEqual(updated.audioFileVersion, 1)
         XCTAssertTrue(updated.favorite)
         XCTAssertEqual(updated.addedAt, song.addedAt)
-        XCTAssertNotEqual(updated.fileName, song.fileName)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(updated.fileName, song.fileName, "Correct index only when the audio file is normal")
+        XCTAssertEqual(try Data(contentsOf: source), original)
         for id in [first, second] { XCTAssertEqual(store.playlists.first(where: { $0.id == id })?.songIDs, [song.id]) }
         let reload = LibraryStore(root: folder)
         XCTAssertEqual(reload.song(song.id), updated)
@@ -147,5 +148,63 @@ final class AudioNormalizationTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("library.json")), index)
         let audioFiles = try FileManager.default.contentsOfDirectory(atPath: folder.path).filter { $0.hasSuffix(".m4a") }
         XCTAssertEqual(audioFiles, [source.lastPathComponent])
+    }
+    @MainActor
+    func testPlaybackCorrectsDoubledIndexWithoutRewritingAudio() async throws {
+        let folder = try root(), store = LibraryStore(root: folder)
+        let source = try fixture("regular", in: folder), original = try Data(contentsOf: source)
+        let song = Song(id: "AbCdEf123_-", title: "Saved", artist: "Artist", duration: 6,
+                        fileName: source.lastPathComponent, favorite: true)
+        try store.save(song, playlistIDs: [])
+        let player = PlayerStore(library: store)
+        player.start([song], at: song)
+        player.pause()
+        let deadline = Date().addingTimeInterval(5)
+        while player.duration > 3.15 && Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertEqual(player.duration, 3, accuracy: 0.15)
+        XCTAssertEqual(try XCTUnwrap(player.current).duration, 3, accuracy: 0.15)
+        XCTAssertEqual(try XCTUnwrap(store.song(song.id)).duration, 3, accuracy: 0.15)
+        player.seek(6)
+        XCTAssertLessThan(player.elapsed, 3.15, "Seek slider must not enter a phantom second half")
+        XCTAssertEqual(try Data(contentsOf: source), original)
+    }
+    @MainActor
+    func testPlaybackAdvancesAtActualAudioEndAndRepeatOneStillWorks() async throws {
+        let folder = try root(), store = LibraryStore(root: folder)
+        let source = try fixture("regular", in: folder)
+        let first = Song(id: "first", title: "First", artist: "Artist", duration: 6, fileName: source.lastPathComponent)
+        let second = Song(id: "second", title: "Second", artist: "Artist", duration: 3,
+                          fileName: source.lastPathComponent, audioFileVersion: 1)
+        try store.save(first, playlistIDs: []); try store.save(second, playlistIDs: [])
+        let player = PlayerStore(library: store)
+        player.start([first, second], at: first)
+        let deadline = Date().addingTimeInterval(5)
+        while player.duration > 3.15 && Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }
+        player.seek(2.7)
+        let nextDeadline = Date().addingTimeInterval(2)
+        while player.current?.id == first.id && Date() < nextDeadline { try await Task.sleep(nanoseconds: 20_000_000) }
+        player.pause()
+        XCTAssertEqual(player.current?.id, second.id)
+        player.toggleRepeat(); player.toggleRepeat()
+        XCTAssertEqual(player.queue.repeatMode, .one)
+        player.seek(2.7); player.play()
+        try await Task.sleep(nanoseconds: 800_000_000)
+        player.pause()
+        XCTAssertEqual(player.current?.id, second.id)
+        XCTAssertLessThan(player.elapsed, 2)
+    }
+    @MainActor
+    func testReplacementCommitFailureDoesNotDeleteOriginal() async throws {
+        let folder = try root(), store = LibraryStore(root: folder)
+        let source = try fixture("regular", in: folder)
+        let song = Song(id: "first", title: "First", artist: "Artist", duration: 6, fileName: source.lastPathComponent)
+        try store.save(song, playlistIDs: [])
+        let replacement = folder.appendingPathComponent("replacement.m4a")
+        try FileManager.default.copyItem(at: source, to: replacement)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("library.previous.json"), withIntermediateDirectories: false)
+        XCTAssertThrowsError(try store.replaceAudio(song.id, expectedFileName: source.lastPathComponent,
+                                                   newFileName: replacement.lastPathComponent, duration: 3))
+        XCTAssertEqual(store.song(song.id), song)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
     }
 }

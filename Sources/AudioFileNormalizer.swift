@@ -82,8 +82,12 @@ enum AudioFileNormalizer {
         let result = AVURLAsset(url: destination, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
         let duration = try await result.load(.duration).seconds
         let playable = try await result.load(.isPlayable)
+        let audioFile = try AVAudioFile(forReading: destination)
+        let decodedDuration = Double(audioFile.length) / audioFile.processingFormat.sampleRate
         guard playable, duration.isFinite, duration > 0,
-              abs(duration - packetEnd.seconds) <= 0.15 else {
+              decodedDuration.isFinite, decodedDuration > 0,
+              abs(duration - packetEnd.seconds) <= 0.15,
+              abs(duration - decodedDuration) <= 0.15 else {
             throw AppFailure("保存した音声の長さが一致しません。曲は登録されていません。")
         }
         if let expected = expectedDuration, expected.isFinite, expected > 0,

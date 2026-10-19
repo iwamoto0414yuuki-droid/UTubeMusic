@@ -118,10 +118,17 @@ final class MusicService: ObservableObject {
                 guard let originalName = song.fileName, let source = library.file(originalName), library.isAvailable(song) else {
                     throw AppFailure("音声ファイルが見つかりません。")
                 }
-                // The old index may itself contain doubled duration. Use actual packets, not that index.
-                let duration = try await AudioFileNormalizer.normalize(source: source, destination: destination)
+                let timing = try await AudioTiming.read(source)
                 try Task.checkCancellation()
-                try library.replaceAudio(song.id, expectedFileName: originalName, newFileName: name, duration: duration)
+                if timing.needsRemux {
+                    let duration = try await AudioFileNormalizer.normalize(source: source, destination: destination,
+                                                                            expectedDuration: timing.duration)
+                    try Task.checkCancellation()
+                    try library.replaceAudio(song.id, expectedFileName: originalName, newFileName: name, duration: duration)
+                } else {
+                    // A normal audio file needs only an index correction, preserving every byte.
+                    try library.updateAudioDuration(song.id, expectedFileName: originalName, duration: timing.duration, verified: true)
+                }
                 repaired += 1
             } catch {
                 try? FileManager.default.removeItem(at: destination)
@@ -186,8 +193,19 @@ final class MusicService: ObservableObject {
             }
             try Task.checkCancellation()
             update(id) { $0.phase = "音声の再生時間を確認中" }
-            let duration = try await AudioFileNormalizer.normalize(source: downloaded, destination: destination,
-                                                                    expectedDuration: metadata.duration)
+            let timing = try await AudioTiming.read(downloaded)
+            let duration: Double
+            if timing.needsRemux {
+                duration = try await AudioFileNormalizer.normalize(source: downloaded, destination: destination,
+                                                                   expectedDuration: metadata.duration)
+            } else {
+                duration = timing.duration
+                if metadata.duration.isFinite, metadata.duration > 0,
+                   abs(duration - metadata.duration) > max(2, metadata.duration * 0.02) {
+                    throw AppFailure("取得元の曲と音声の長さが一致しません。再試行してください。")
+                }
+                try FileManager.default.moveItem(at: downloaded, to: destination)
+            }
             if let thumbnail = metadata.thumbnail, let url = URL(string: thumbnail), url.scheme == "https" {
                 // Artwork failure must not prevent listening. Cache it for offline use.
                 artworkName = await cacheArtwork(url, id: job.song.id)
