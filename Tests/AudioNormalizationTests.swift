@@ -78,6 +78,9 @@ final class AudioNormalizationTests: XCTestCase {
         let rawDuration = try await AVURLAsset(url: source).load(.duration).seconds
         print("DASH regression: raw container duration", rawDuration, "actual audio 3 seconds")
         XCTAssertGreaterThan(rawDuration, 5.5, "Reproduce Apple's doubled DASH duration from real 3-second AAC")
+        let measured = try await AudioTiming.read(source)
+        XCTAssertEqual(measured.duration, 3, accuracy: 0.15)
+        XCTAssertTrue(measured.needsRemux)
         let destination = folder.appendingPathComponent("fixed.m4a")
         let duration = try await AudioFileNormalizer.normalize(source: source, destination: destination, expectedDuration: 3)
         XCTAssertEqual(duration, 3, accuracy: 0.15)
@@ -207,5 +210,20 @@ final class AudioNormalizationTests: XCTestCase {
                                                    newFileName: replacement.lastPathComponent, duration: 3))
         XCTAssertEqual(store.song(song.id), song)
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+    }
+    @MainActor
+    func testRepairDoubledDASHContainerUsesValidatedReplacement() async throws {
+        let folder = try root(), store = LibraryStore(root: folder)
+        let source = try fixture("dash_nonzero_headers", in: folder)
+        let song = Song(id: "AbCdEf123_-", title: "DASH", artist: "Artist", duration: 6, fileName: source.lastPathComponent)
+        try store.save(song, playlistIDs: [])
+        await MusicService(library: store).repairSavedSongs()
+        let updated = try XCTUnwrap(store.song(song.id))
+        XCTAssertEqual(updated.duration, 3, accuracy: 0.15)
+        XCTAssertEqual(updated.audioFileVersion, 1)
+        XCTAssertNotEqual(updated.fileName, song.fileName)
+        let file = try XCTUnwrap(store.file(updated.fileName))
+        try assertToneAndSilence(file)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
     }
 }

@@ -27,7 +27,7 @@ def main():
         assert "** TEST SUCCEEDED **" in log and "** TEST FAILED **" not in log
         counts = re.findall(r"Executed (\d+) tests, with 0 failures", log)
         native_tests = max(map(int, counts))
-        assert native_tests >= 41
+        assert native_tests >= 42
         assert "AudioNormalizationTests" in log and "DASH regression:" in log
         ipa_bytes = bundle.read(filename)
         digest = hashlib.sha256(ipa_bytes).hexdigest()
