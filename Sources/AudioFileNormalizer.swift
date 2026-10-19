@@ -47,14 +47,15 @@ enum AudioFileNormalizer {
         writer.add(input)
         guard writer.startWriting() else { throw writer.error ?? AppFailure("音声を保存できません。") }
         defer { if writer.status == .writing { writer.cancelWriting() } }
-        writer.startSession(atSourceTime: .zero)
+        // Let AVAssetWriter rebase the original timestamps. Compressed AAC buffers
+        // can carry packet timing without an explicit per-sample timing array.
+        writer.startSession(atSourceTime: origin)
         var next: CMSampleBuffer? = first
         var packetEnd = CMTime.zero
         while let sample = next {
             try Task.checkCancellation()
-            let shifted = try shifting(sample, by: origin)
-            let start = CMSampleBufferGetPresentationTimeStamp(shifted)
-            let duration = CMSampleBufferGetDuration(shifted)
+            let start = CMTimeSubtract(CMSampleBufferGetPresentationTimeStamp(sample), origin)
+            let duration = CMSampleBufferGetDuration(sample)
             guard start.isNumeric, duration.isNumeric, duration.seconds > 0,
                   start.seconds >= 0, start.seconds <= packetEnd.seconds + 0.1 else {
                 throw AppFailure("音声の時間情報が不正です。元の曲は保持しています。")
@@ -69,13 +70,13 @@ enum AudioFileNormalizer {
                 }
                 try await Task.sleep(nanoseconds: 2_000_000)
             }
-            guard input.append(shifted) else { throw writer.error ?? AppFailure("音声の保存に失敗しました。") }
+            guard input.append(sample) else { throw writer.error ?? AppFailure("音声の保存に失敗しました。") }
             packetEnd = end
             next = output.copyNextSampleBuffer()
         }
         guard reader.status == .completed else { throw reader.error ?? AppFailure("音声を最後まで読み込めませんでした。") }
         input.markAsFinished()
-        writer.endSession(atSourceTime: packetEnd)
+        writer.endSession(atSourceTime: CMTimeAdd(origin, packetEnd))
         await writer.finishWriting()
         try Task.checkCancellation()
         guard writer.status == .completed else { throw writer.error ?? AppFailure("音声の保存を完了できませんでした。") }
@@ -98,27 +99,4 @@ enum AudioFileNormalizer {
         return duration
     }
 
-    private static func shifting(_ sample: CMSampleBuffer, by origin: CMTime) throws -> CMSampleBuffer {
-        var count = 0
-        let status = CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil,
-                                                           entriesNeededOut: &count)
-        // CoreMedia reports ArrayTooSmall during a size-only query with no destination buffer.
-        guard (status == noErr || status == kCMSampleBufferError_ArrayTooSmall), count > 0 else {
-            throw AppFailure("音声の時間情報を読み込めません。")
-        }
-        var timing = Array(repeating: CMSampleTimingInfo(), count: count)
-        guard CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: count, arrayToFill: &timing,
-                                                     entriesNeededOut: &count) == noErr else {
-            throw AppFailure("音声の時間情報を読み込めません。")
-        }
-        for i in timing.indices {
-            timing[i].presentationTimeStamp = CMTimeSubtract(timing[i].presentationTimeStamp, origin)
-            if timing[i].decodeTimeStamp.isNumeric { timing[i].decodeTimeStamp = CMTimeSubtract(timing[i].decodeTimeStamp, origin) }
-        }
-        var result: CMSampleBuffer?
-        guard CMSampleBufferCreateCopyWithNewTiming(allocator: kCFAllocatorDefault, sampleBuffer: sample,
-                sampleTimingEntryCount: timing.count, sampleTimingArray: &timing, sampleBufferOut: &result) == noErr,
-              let result else { throw AppFailure("音声の時間情報を補正できません。") }
-        return result
-    }
 }
