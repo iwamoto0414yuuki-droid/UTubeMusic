@@ -100,8 +100,10 @@ enum AudioFileNormalizer {
 
     private static func shifting(_ sample: CMSampleBuffer, by origin: CMTime) throws -> CMSampleBuffer {
         var count = 0
-        guard CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil,
-                                                     entriesNeededOut: &count) == noErr, count > 0 else {
+        let status = CMSampleBufferGetSampleTimingInfoArray(sample, entryCount: 0, arrayToFill: nil,
+                                                           entriesNeededOut: &count)
+        // CoreMedia reports ArrayTooSmall during a size-only query with no destination buffer.
+        guard (status == noErr || status == kCMSampleBufferError_ArrayTooSmall), count > 0 else {
             throw AppFailure("音声の時間情報を読み込めません。")
         }
         var timing = Array(repeating: CMSampleTimingInfo(), count: count)

@@ -77,6 +77,7 @@ final class AudioNormalizationTests: XCTestCase {
         let folder = try root(), source = try fixture("dash_nonzero_headers", in: folder)
         let rawDuration = try await AVURLAsset(url: source).load(.duration).seconds
         print("DASH regression: raw container duration", rawDuration, "actual audio 3 seconds")
+        XCTAssertGreaterThan(rawDuration, 5.5, "Reproduce Apple's doubled DASH duration from real 3-second AAC")
         let destination = folder.appendingPathComponent("fixed.m4a")
         let duration = try await AudioFileNormalizer.normalize(source: source, destination: destination, expectedDuration: 3)
         XCTAssertEqual(duration, 3, accuracy: 0.15)
