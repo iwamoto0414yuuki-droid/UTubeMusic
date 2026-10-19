@@ -114,7 +114,13 @@ final class PlayerStore: ObservableObject {
             if let next = queue.current, let song = library.song(next), library.isAvailable(song) { load(song) }
         }
     }
-    private func load(_ song: Song) {
+    func refreshAfterAudioRepair() {
+        guard let current, let updated = library.song(current.id), updated.fileName != current.fileName else { return }
+        let position = elapsed, wasPlaying = playing
+        load(updated, autoplay: wasPlaying)
+        seek(min(position, updated.duration))
+    }
+    private func load(_ song: Song, autoplay: Bool = true) {
         guard let url = library.file(song.fileName), library.isAvailable(song) else { error = "音声ファイルが見つかりません。"; return }
         statusObservation = nil
         player.pause()
@@ -133,7 +139,7 @@ final class PlayerStore: ObservableObject {
                 if failed { self.pause(); self.error = detail ?? "この曲を再生できません。" }
             }
         }
-        play()
+        if autoplay { play() } else { playing = false; updateNowPlaying() }
     }
     private func updateNowPlaying() {
         guard let current else { return }

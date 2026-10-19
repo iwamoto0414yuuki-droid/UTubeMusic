@@ -72,6 +72,27 @@ final class LibraryStore: ObservableObject {
             }
         }
     }
+    /// Publish a verified replacement first; a failed index write keeps the original playable.
+    func replaceAudio(_ id: String, expectedFileName: String, newFileName: String, duration: Double) throws {
+        guard let replacement = file(newFileName), newFileName != expectedFileName,
+              fm.fileExists(atPath: replacement.path), duration.isFinite, duration > 0,
+              let current = song(id), current.fileName == expectedFileName else {
+            throw AppFailure("曲の状態が変わったため修復を中止しました。元の曲は保持しています。")
+        }
+        let bytes = (try fm.attributesOfItem(atPath: replacement.path)[.size] as? NSNumber)?.int64Value ?? 0
+        guard bytes > 0 else { throw AppFailure("修復した音声データがありません。") }
+        try commit {
+            if let index = songs.firstIndex(where: { $0.id == id }) {
+                songs[index].fileName = newFileName
+                songs[index].duration = duration
+                songs[index].bytes = bytes
+                songs[index].audioFileVersion = 1
+            }
+        }
+        if !songs.contains(where: { $0.fileName == expectedFileName }), let original = file(expectedFileName) {
+            try? fm.removeItem(at: original)
+        }
+    }
     @discardableResult func createPlaylist(_ name: String) throws -> UUID {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw AppFailure("プレイリスト名を入力してください。") }

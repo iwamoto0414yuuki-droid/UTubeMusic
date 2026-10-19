@@ -61,6 +61,8 @@ struct SaveJob: Identifiable {
 @MainActor
 final class MusicService: ObservableObject {
     @Published var jobs: [SaveJob] = []
+    @Published private(set) var repairing = false
+    @Published private(set) var repairProgress: String?
     private var tasks: [UUID: Task<Void, Never>] = [:]
     private let engine = PythonService.shared
     let library: LibraryStore
@@ -95,8 +97,41 @@ final class MusicService: ObservableObject {
         for job in jobs where !job.finished && job.error == nil { cancel(job.id) }
     }
     private func scheduleNext() {
-        guard tasks.isEmpty, let job = jobs.first(where: { !$0.finished && $0.error == nil }) else { return }
+        guard !repairing, tasks.isEmpty, let job = jobs.first(where: { !$0.finished && $0.error == nil }) else { return }
         tasks[job.id] = Task { await perform(job.id) }
+    }
+    func repairSavedSongs() async {
+        guard !repairing else { return }
+        guard tasks.isEmpty else { library.message = "曲の保存が終わってから修復してください。"; return }
+        guard !library.recoveryNeeded else { library.message = "ライブラリの復元が必要です。"; return }
+        repairing = true
+        defer { repairing = false; scheduleNext() }
+        let candidates = library.songs.filter { !$0.id.hasPrefix("local-") && $0.audioFileVersion != 1 }
+        var repaired = 0
+        var failures: [String] = []
+        for (index, song) in candidates.enumerated() {
+            repairProgress = "\(index + 1) / \(candidates.count)曲：\(song.title)"
+            let name = UUID().uuidString + ".m4a"
+            let destination = library.root.appendingPathComponent(name)
+            do {
+                try Task.checkCancellation()
+                guard let originalName = song.fileName, let source = library.file(originalName), library.isAvailable(song) else {
+                    throw AppFailure("音声ファイルが見つかりません。")
+                }
+                // The old index may itself contain doubled duration. Use actual packets, not that index.
+                let duration = try await AudioFileNormalizer.normalize(source: source, destination: destination)
+                try Task.checkCancellation()
+                try library.replaceAudio(song.id, expectedFileName: originalName, newFileName: name, duration: duration)
+                repaired += 1
+            } catch {
+                try? FileManager.default.removeItem(at: destination)
+                failures.append(song.title + "：" + error.localizedDescription)
+                if Task.isCancelled { break }
+            }
+        }
+        repairProgress = nil
+        library.message = candidates.isEmpty ? "修復が必要な曲はありません。" : "\(repaired)曲の再生時間を修復しました。" +
+            (failures.isEmpty ? "" : "\n修復できなかった曲は元のまま保持しています。\n" + failures.joined(separator: "\n"))
     }
     func saveCollection(_ songs: [Song], title: String, sourceID: String, favorite: Bool) throws {
         guard !songs.isEmpty else { throw AppFailure("保存できる曲がありません。") }
@@ -125,12 +160,14 @@ final class MusicService: ObservableObject {
         guard let job = jobs.first(where: { $0.id == id }) else { return }
         let fileName = UUID().uuidString + ".m4a"
         let destination = library.root.appendingPathComponent(fileName)
+        let downloaded = library.root.appendingPathComponent(UUID().uuidString + ".download.m4a")
         var artworkName: String?
         // Extraction requires the foreground. This assertion only grants a short grace period.
         let background = UIApplication.shared.beginBackgroundTask(withName: "Finish saving music") { [weak self] in
             Task { @MainActor in self?.cancel(id) }
         }
         defer {
+            try? FileManager.default.removeItem(at: downloaded)
             tasks[id] = nil
             if background != .invalid { UIApplication.shared.endBackgroundTask(background) }
             scheduleNext()
@@ -144,19 +181,13 @@ final class MusicService: ObservableObject {
                   url.scheme == "https", let host = url.host, host.hasSuffix(".googlevideo.com"),
                   let metadata = response.song else { throw AppFailure("音声の保存先を確認できませんでした。") }
             update(id) { $0.phase = "曲を保存中" }
-            try await AudioTransfer.download(url: url, headers: response.headers ?? [:], expected: response.bytes ?? 0, to: destination) { [weak self] progress in
+            try await AudioTransfer.download(url: url, headers: response.headers ?? [:], expected: response.bytes ?? 0, to: downloaded) { [weak self] progress in
                 Task { @MainActor in self?.update(id) { $0.fraction = progress } }
             }
             try Task.checkCancellation()
-            update(id) { $0.phase = "再生できるか確認中" }
-            let asset = AVURLAsset(url: destination)
-            let playable = try await asset.load(.isPlayable)
-            let duration = try await asset.load(.duration).seconds
-            let audio = try await asset.loadTracks(withMediaType: .audio)
-            let video = try await asset.loadTracks(withMediaType: .video)
-            guard playable, duration.isFinite, duration > 0, !audio.isEmpty, video.isEmpty else {
-                throw AppFailure("保存したデータを音楽として再生できません。曲は登録されていません。")
-            }
+            update(id) { $0.phase = "音声の再生時間を確認中" }
+            let duration = try await AudioFileNormalizer.normalize(source: downloaded, destination: destination,
+                                                                    expectedDuration: metadata.duration)
             if let thumbnail = metadata.thumbnail, let url = URL(string: thumbnail), url.scheme == "https" {
                 // Artwork failure must not prevent listening. Cache it for offline use.
                 artworkName = await cacheArtwork(url, id: job.song.id)
@@ -166,6 +197,7 @@ final class MusicService: ObservableObject {
             let latest = jobs.first(where: { $0.id == id }) ?? job
             song.favorite = latest.song.favorite; song.duration = duration
             song.fileName = fileName; song.artworkName = artworkName
+            song.audioFileVersion = 1
             song.bytes = (try FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
             try library.save(song, playlistIDs: latest.playlistIDs)
             update(id) { $0.song = song; $0.fraction = 1; $0.phase = "保存しました"; $0.finished = true }
