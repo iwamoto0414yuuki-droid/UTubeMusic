@@ -33,8 +33,11 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               f.write('SIMULATOR_ID=' + phones[0]['udid'] + '\n')
           PY
+      - name: Boot iPhone simulator
+        timeout-minutes: 5
+        run: xcrun simctl bootstatus "$SIMULATOR_ID" -b
       - name: Native build and queue/library tests
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           xcodebuild -project UTubeMusic.xcodeproj -scheme UTubeMusic -configuration Debug \

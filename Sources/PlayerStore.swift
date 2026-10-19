@@ -130,7 +130,7 @@ final class PlayerStore: ObservableObject {
         player.pause()
         let item = AVPlayerItem(url: url)
         current = song; elapsed = 0; duration = song.duration
-        if song.audioFileVersion == 1, duration.isFinite, duration > 0 {
+        if song.audioTimingVersion == 1, duration.isFinite, duration > 0 {
             item.forwardPlaybackEndTime = CMTime(seconds: duration, preferredTimescale: 44100)
         } else {
             durationTask = Task { [weak self, weak item] in
@@ -143,7 +143,7 @@ final class PlayerStore: ObservableObject {
                     item.forwardPlaybackEndTime = CMTime(seconds: timing.duration, preferredTimescale: 44100)
                     if let fileName = song.fileName {
                         do { try self.library.updateAudioDuration(song.id, expectedFileName: fileName,
-                                                                  duration: timing.duration, verified: !timing.needsRemux) }
+                                                                  duration: timing.duration) }
                         catch { self.library.message = error.localizedDescription }
                     }
                     self.updateNowPlaying()

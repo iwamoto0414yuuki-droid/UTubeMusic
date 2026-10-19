@@ -249,7 +249,7 @@ struct SettingsView: View {
                     } label: { Label("保存した曲の再生時間を修復", systemImage: "waveform.badge.magnifyingglass") }
                         .disabled(music.repairing || library.recoveryNeeded || music.jobs.contains { !$0.finished && $0.error == nil })
                     if let progress = music.repairProgress { ProgressView(progress) }
-                    Text("曲の後半が無音になる場合、保存済みの音声を修復します。再ダウンロードは不要です。お気に入り・プレイリストを保ったまま1曲ずつ処理します。完了までアプリを開いてください。")
+                    Text("音声ファイルを変更せず、アプリ内の再生時間を確認・修復します。再ダウンロードは不要です。お気に入り・プレイリストを保ったまま1曲ずつ処理します。完了までアプリを開いてください。")
                         .font(.caption).foregroundStyle(Palette.secondary)
                 }
                 Section("バックアップ") {

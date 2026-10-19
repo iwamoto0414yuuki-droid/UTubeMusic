@@ -11,7 +11,7 @@ struct Song: Identifiable, Codable, Equatable {
     var bytes: Int64 = 0
     var favorite = false
     var addedAt = Date()
-    var audioFileVersion: Int? = nil
+    var audioTimingVersion: Int? = nil
 
     var sourceURL: String { "https://www.youtube.com/watch?v=\(id)" }
     var timeLabel: String { Self.clock(duration) }

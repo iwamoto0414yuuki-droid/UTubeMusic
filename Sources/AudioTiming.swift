@@ -2,7 +2,7 @@ import AVFoundation
 
 struct AudioTiming {
     let duration: Double
-    let needsRemux: Bool
+    let containerDuration: Double
 
     /// Count audio frames independently of the movie/container duration and saved index.
     static func read(_ url: URL) async throws -> AudioTiming {
@@ -17,7 +17,7 @@ struct AudioTiming {
             let playable = try await asset.load(.isPlayable)
             guard playable, audio.count == 1, video.isEmpty else { throw AppFailure("保存したデータを音楽として確認できません。") }
             guard duration.isFinite, duration > 0 else { throw AppFailure("音声の再生時間を確認できません。") }
-            return AudioTiming(duration: duration, needsRemux: !containerDuration.isFinite || abs(containerDuration - duration) > 0.15)
+            return AudioTiming(duration: duration, containerDuration: containerDuration)
         }
         return try await withTaskCancellationHandler { try await work.value } onCancel: { work.cancel() }
     }
