@@ -2,13 +2,15 @@
 
 対象: iPhone 14、利用者申告 iOS 27.0.1。2026-10-19。
 
-## 導入済みの方：0.2.1へ更新
+## 導入済みの方：0.2.2へ更新
 
 1. 念のため「ファイル」→「このiPhone内」→「UTube Music」→「UTubeMusic」をフォルダーごとコピーしておく。
-2. 新しい `release/UTubeMusic-0.2.1-unsigned.ipa` をiPhoneの「ファイル」へ渡す。
+2. 新しい `release/UTubeMusic-0.2.2-unsigned.ipa` をiPhoneの「ファイル」へ渡す。
 3. Wi-FiとLocalDevVPNをオンにし、前回と同じApple AccountのSideStoreで＋から新しいIPAを選ぶ。
 4. 既存のUTube Musicへ上書き更新する。**先にアプリを削除しない。** 同じアプリIDで曲・プレイリストを引き継ぐ構成です。
-5. 設定のバージョンが0.2.1になり、保存した曲が残っていることを確認する。
+5. 設定のバージョンが0.2.2になり、保存した曲が残っていることを確認する。
+6. アプリのホーム右上の設定 →「保存した曲の再生時間を修復」を実行する。完了までアプリを開いておく。音声ファイルは変更せず、再ダウンロードせずにアプリ内の曲の長さを再確認します。お気に入り・プレイリスト・曲順は保持します。
+7. 問題が出ていた曲を再生し、表示時間・曲末での次曲への移行・1曲リピート・ロック画面の時間を確認する。全曲修復を先に行わなくても、旧バージョンの曲は再生時に長さを再確認します。
 
 初回導入の手順は以下です。初回はWindows PCとiPhoneをUSBケーブルで接続します。Apple Account・端末パスコードの入力はご本人が行ってください。このアプリの開発者へ送る必要はありません。
 
@@ -35,9 +37,9 @@ iPhoneで[LocalDevVPNのApp Storeページ](https://apps.apple.com/jp/app/locald
 
 ## 3. UTube MusicのIPAを入れる
 
-**0.2.1のIPAを生成し、47件のテストと実機向けARM64ビルドに成功しました。** Windows側の `release/UTubeMusic-0.2.1-unsigned.ipa` を使います。個人用の開発版です。ソースコードZIPはインストールできません。
+**0.2.2のIPAを生成し、55件のテストと実機向けARM64ビルドに成功しました。** Windows側の `release/UTubeMusic-0.2.2-unsigned.ipa` を使います。個人用の開発版です。更新後の実機確認は必要です。ソースコードZIPはインストールできません。
 
-1. Windowsにある `UTubeMusic-0.2.1-unsigned.ipa` を、ご自身のiCloud Driveや普段使うファイル転送手段でiPhoneの「ファイル」アプリへ渡す。メールなどで他人へ配布する必要はありません。
+1. Windowsにある `UTubeMusic-0.2.2-unsigned.ipa` を、ご自身のiCloud Driveや普段使うファイル転送手段でiPhoneの「ファイル」アプリへ渡す。メールなどで他人へ配布する必要はありません。
 2. iPhoneをWi-Fiへ接続し、LocalDevVPNをConnectにする。
 3. SideStore → My Apps → 追加（＋）からIPAを選択し、署名・インストールが終わるまで待つ。
 4. ホーム画面の「UTube Music」を開く。
