@@ -27,7 +27,8 @@ def main():
         assert "** TEST SUCCEEDED **" in log and "** TEST FAILED **" not in log
         counts = re.findall(r"Executed (\d+) tests, with 0 failures", log)
         native_tests = max(map(int, counts))
-        assert native_tests >= 39
+        assert native_tests >= 45
+        assert "PreviewTests" in log
         assert "AudioTimingTests" in log and "DASH regression:" in log
         ipa_bytes = bundle.read(filename)
         digest = hashlib.sha256(ipa_bytes).hexdigest()
@@ -63,7 +64,7 @@ def main():
     report = {"version": version, "bundle_id": info["CFBundleIdentifier"], "platform": "iphoneos",
               "architecture": "arm64", "sha256": digest, "bytes": len(ipa_bytes), "frameworks": len(frameworks),
               "background_audio": True, "signed_for_device": False, "physical_iPhone_tested": False,
-              "native_tests": native_tests, "python_tests": 16, "native_test_result": "passed",
+              "native_tests": native_tests, "python_tests": 19, "native_test_result": "passed",
               "ci_run": f"https://github.com/iwamoto0414yuuki-droid/UTubeMusic/actions/runs/{args.run}",
               "source_commit": args.commit}
     text = json.dumps(report, indent=2) + "\n"

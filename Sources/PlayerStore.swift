@@ -18,6 +18,16 @@ final class PlayerStore: ObservableObject {
     private var notifications: [NSObjectProtocol] = []
     private var resumeAfterInterruption = false
     private var artwork: MPMediaItemArtwork?
+    lazy var preview = PreviewController(suspendMain: { [weak self] in
+        guard let self else { return false }
+        let resume = self.playing; self.pauseMain(); return resume
+    }, resumeMain: { [weak self] in self?.play() }, onError: { [weak self] message in self?.error = message })
+
+    func togglePreview(_ song: Song) {
+        let saved = library.song(song.id)
+        let local = saved.flatMap { library.isAvailable($0) ? library.file($0.fileName) : nil }
+        preview.toggle(song, localURL: local)
+    }
 
     init(library: LibraryStore) {
         self.library = library
@@ -33,7 +43,8 @@ final class PlayerStore: ObservableObject {
         }
         notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main) { [weak self] note in
             Task { @MainActor in
-                guard let self, let item = note.object as? AVPlayerItem, item === self.player.currentItem else { return }
+                guard let self, let item = note.object as? AVPlayerItem, item === self.player.currentItem,
+                      self.preview.song == nil else { return }
                 self.next(automatically: true)
             }
         })
@@ -71,6 +82,7 @@ final class PlayerStore: ObservableObject {
         load(song)
     }
     func play() {
+        preview.stop(resume: false)
         guard current != nil else { return }
         if duration > 0 && elapsed >= duration - 0.1 { seek(0) }
         do {
@@ -78,15 +90,21 @@ final class PlayerStore: ObservableObject {
             player.play(); playing = true; updateNowPlaying()
         } catch { self.error = error.localizedDescription }
     }
-    func pause() { player.pause(); playing = false; updateNowPlaying() }
-    func toggle() { playing ? pause() : play() }
+    private func pauseMain() { player.pause(); playing = false; updateNowPlaying() }
+    func pause() { preview.stop(resume: false); pauseMain() }
+    func toggle() {
+        if preview.song != nil { preview.stop(resume: false) }
+        else { playing ? pause() : play() }
+    }
     func seek(_ seconds: Double) {
+        preview.stop(resume: false)
         guard seconds.isFinite else { return }
         elapsed = min(max(0, seconds), max(0, duration))
         player.seek(to: CMTime(seconds: elapsed, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         updateNowPlaying()
     }
     func next(automatically: Bool = false) {
+        preview.stop(resume: false)
         // Skip missing files, without recursion or an infinite repeat loop.
         var inspected = Set<String>()
         while let id = queue.advance(automatically: automatically) {
@@ -97,6 +115,7 @@ final class PlayerStore: ObservableObject {
         if automatically { seek(duration) }
     }
     func previous() {
+        preview.stop(resume: false)
         if elapsed > 3 { seek(0); return }
         if let id = queue.previous(), let song = library.song(id), library.isAvailable(song) { load(song) }
         else { seek(0) }
@@ -123,6 +142,7 @@ final class PlayerStore: ObservableObject {
         seek(min(position, updated.duration))
     }
     private func load(_ song: Song, autoplay: Bool = true) {
+        preview.stop(resume: false)
         let song = library.song(song.id) ?? song
         guard let url = library.file(song.fileName), library.isAvailable(song) else { error = "音声ファイルが見つかりません。"; return }
         statusObservation = nil

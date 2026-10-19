@@ -39,6 +39,9 @@ struct RootView: View {
         .sheet(isPresented: $showSettings) { SettingsView() }
         .fullScreenCover(isPresented: $showPlayer) { NowPlayingView() }
         .appFeedback()
+        .onChange(of: tab) { _, _ in player.preview.stop() }
+        .onChange(of: showPlayer) { _, value in if value { player.preview.stop() } }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in player.preview.stop() }
         .onOpenURL { url in
             guard url.scheme == "utubemusic", let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
                   let value = components.queryItems?.first(where: { $0.name == "url" })?.value else { return }
@@ -53,6 +56,7 @@ struct RootView: View {
     }
     private var bottomBar: some View {
         VStack(spacing: 0) {
+            PreviewBanner(preview: player.preview)
             if let song = player.current {
                 VStack(spacing: 0) {
                     HStack(spacing: 8) {

@@ -24,6 +24,9 @@ struct EngineResponse: Decodable {
     let items: [CatalogItem]?
     let collection: CatalogItem?
     let unavailable: Int?
+    let preview_start: Double?
+    let preview_end: Double?
+    let preview_kind: String?
 }
 
 final class PythonService {

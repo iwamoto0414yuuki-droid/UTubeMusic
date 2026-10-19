@@ -53,6 +53,7 @@ struct AddSongsLink: View {
 struct AddSongsView: View {
     let destination: SongAddDestination
     @EnvironmentObject private var library: LibraryStore
+    @EnvironmentObject private var player: PlayerStore
     @State private var mode: Int
     @State private var query = ""
     @State private var submitted = ""
@@ -121,6 +122,8 @@ struct AddSongsView: View {
             .toolbar(.visible, for: .navigationBar).toolbarBackground(Palette.background, for: .navigationBar)
             .task(id: generation) { await search.search(submitted) }
             .appFeedback()
+            .onDisappear { player.preview.stop() }
+            .onChange(of: mode) { _, _ in player.preview.stop() }
     }
     private func submit() {
         focused = false
@@ -135,7 +138,7 @@ struct DestinationSongRow: View {
     private var added: Bool { destination.contains(song, in: library) }
     var body: some View {
         SongRow(song: song, trailing: added ? "checkmark.circle.fill" : "plus.circle",
-                trailingLabel: added ? "\(song.title)は追加済み" : "\(song.title)を追加") { add() } more: { add() }
+                trailingLabel: added ? "\(song.title)は追加済み" : "\(song.title)を追加", allowsPreview: true) { add() } more: { add() }
     }
     private func add() {
         guard !added else { return }

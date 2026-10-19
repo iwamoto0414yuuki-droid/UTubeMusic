@@ -165,4 +165,21 @@ final class ScreenCaptureTests: XCTestCase {
         let target = try library.createPlaylist("通学のおとも")
         try await render(NavigationStack { AddSongsView(destination: .playlist(target), initialMode: 1) }.environmentObject(library).environmentObject(player).environmentObject(music), name: "native-add-saved")
     }
+    func testCapturePreviewControlsAndBanner() async throws {
+        let (library, player, music, song) = try playableLibrary()
+        defer { player.pause() }
+        player.togglePreview(song)
+        let view = PlayerScaffold {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("曲を試し聞き").font(.largeTitle.bold())
+                Text("保存する前に、再生ボタンで確認できます。")
+                    .font(.subheadline).foregroundStyle(Palette.secondary)
+                SongRow(song: song, trailing: "arrow.down.circle", allowsPreview: true, action: {}, more: {})
+                Spacer()
+            }.padding(20).background(Palette.background)
+        } chrome: { PreviewBanner(preview: player.preview) }
+        try await render(view.environmentObject(library).environmentObject(player).environmentObject(music), name: "native-preview")
+        XCTAssertNotNil(player.preview.song)
+        XCTAssertFalse(player.playing)
+    }
 }
