@@ -4,6 +4,7 @@ No account, API key, remote helper, subprocess or FFmpeg is used here.
 WebKit challenge support is experimental and must be tested on an actual iPhone.
 """
 import json
+import math
 import re
 import urllib.parse
 
@@ -77,6 +78,37 @@ def select_audio(info):
             "bytes": selected.get("filesize") or 0, "bitrate": selected.get("abr") or 0}
 
 
+def preview_window(info):
+    """Use explicitly named chorus chapters; otherwise say honestly that it is a middle excerpt."""
+    def number(value):
+        try:
+            value = float(value)
+            return value if math.isfinite(value) and value >= 0 else None
+        except (TypeError, ValueError):
+            return None
+    duration = number(info.get("duration")) or 0
+    start = max(0, min(duration * 0.4, duration - 15)) if duration > 15 else 0
+    kind = "middle" if start > 0 else "beginning"
+    end = min(duration, start + 15) if duration else 15
+    for chapter in info.get("chapters") or []:
+        if not isinstance(chapter, dict):
+            continue
+        title = str(chapter.get("title") or "")
+        if not re.search(r"\b(?:chorus|refrain)\b|サビ", title, re.I) or re.search(r"pre[- ]?chorus|サビ前", title, re.I):
+            continue
+        value = number(chapter.get("start_time"))
+        if value is None or (duration and value >= duration):
+            continue
+        start = value
+        end = min(start + 15, duration) if duration else start + 15
+        chapter_end = number(chapter.get("end_time"))
+        if chapter_end is not None and chapter_end > start:
+            end = min(end, chapter_end)
+        kind = "chorus"
+        break
+    return {"preview_start": start, "preview_end": end, "preview_kind": kind}
+
+
 def dispatch(request_json):
     try:
         request = json.loads(request_json)
@@ -145,11 +177,14 @@ def dispatch(request_json):
                     continue
             return json.dumps({"ok": True, "songs": songs, "has_more": has_more,
                                "next_offset": offset + consumed}, ensure_ascii=False)
-        if op == "resolve":
+        if op in ("resolve", "preview"):
             ident = video_id(str(request.get("id", "")))
             with YoutubeDL(options) as ydl:
                 info = ydl.extract_info("https://www.youtube.com/watch?v=" + ident, download=False)
-            return json.dumps({"ok": True, **select_audio(info)}, ensure_ascii=False)
+            result = {"ok": True, **select_audio(info)}
+            if op == "preview":
+                result.update(preview_window(info))
+            return json.dumps(result, ensure_ascii=False)
         raise ValueError("未対応の操作です。")
     except Exception as exc:
         # Do not expose expiring media URLs, tokens or a Python traceback to the UI.

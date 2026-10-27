@@ -33,8 +33,11 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               f.write('SIMULATOR_ID=' + phones[0]['udid'] + '\n')
           PY
+      - name: Boot iPhone simulator
+        timeout-minutes: 5
+        run: xcrun simctl bootstatus "$SIMULATOR_ID" -b
       - name: Native build and queue/library tests
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           set -euo pipefail
           xcodebuild -project UTubeMusic.xcodeproj -scheme UTubeMusic -configuration Debug \
@@ -51,10 +54,10 @@ jobs:
         run: bash scripts/build_ipa.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: UTubeMusic-0.2.1-SideStore
+          name: UTubeMusic-0.2.3-SideStore
           path: |
-            build/UTubeMusic-0.2.1-unsigned.ipa
-            build/UTubeMusic-0.2.1-unsigned.ipa.sha256
+            build/UTubeMusic-0.2.3-unsigned.ipa
+            build/UTubeMusic-0.2.3-unsigned.ipa.sha256
             build/native-*.png
             build/native-tests.log
           retention-days: 1

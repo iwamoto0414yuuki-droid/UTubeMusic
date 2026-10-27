@@ -230,6 +230,8 @@ struct DownloadsView: View {
 
 struct SettingsView: View {
     @EnvironmentObject private var library: LibraryStore
+    @EnvironmentObject private var music: MusicService
+    @EnvironmentObject private var player: PlayerStore
     @Environment(\.dismiss) private var dismiss
     @State private var importing = false
     var body: some View {
@@ -240,6 +242,16 @@ struct SettingsView: View {
                     LabeledContent("曲の容量", value: ByteCountFormatter.string(fromByteCount: library.totalBytes, countStyle: .file))
                     Button { importing = true } label: { Label("音声ファイルを読み込む", systemImage: "folder.badge.plus") }
                 } header: { Text("このiPhoneのライブラリ") }
+                Section("再生時間の修復") {
+                    Button {
+                        player.pause()
+                        Task { await music.repairSavedSongs(); player.refreshAfterAudioRepair() }
+                    } label: { Label("保存した曲の再生時間を修復", systemImage: "waveform.badge.magnifyingglass") }
+                        .disabled(music.repairing || library.recoveryNeeded || music.jobs.contains { !$0.finished && $0.error == nil })
+                    if let progress = music.repairProgress { ProgressView(progress) }
+                    Text("音声ファイルを変更せず、アプリ内の再生時間を確認・修復します。再ダウンロードは不要です。お気に入り・プレイリストを保ったまま1曲ずつ処理します。完了までアプリを開いてください。")
+                        .font(.caption).foregroundStyle(Palette.secondary)
+                }
                 Section("バックアップ") {
                     Text("「ファイル」アプリ → このiPhone内 → UTube Music → UTubeMusic をフォルダーごとコピーすると、曲とプレイリストを保管できます。アプリを削除する前にバックアップしてください。")
                         .font(.subheadline).foregroundStyle(Palette.secondary)
@@ -251,7 +263,7 @@ struct SettingsView: View {
                         .font(.subheadline).foregroundStyle(Palette.secondary)
                 }
                 Section {
-                    LabeledContent("バージョン", value: "0.2.1 開発版")
+                    LabeledContent("バージョン", value: "0.2.3 開発版")
                     Text("個人用の音楽ライブラリ。曲の取得はYouTubeの仕様や制限により失敗する場合があります。")
                         .font(.caption).foregroundStyle(Palette.secondary)
                     Text("Python / yt-dlp / yt-dlp-ejs / certifi / yt-dlp-apple-webkit-jsi / ytmusicapi / requests を使用。ライセンスはアプリ内の同梱ファイル ThirdPartyNotices を参照。")

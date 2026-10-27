@@ -99,7 +99,7 @@ struct SongSearchResults: View {
                     if let destination, let existing, available {
                         DestinationSongRow(song: existing, destination: destination)
                     } else {
-                    SongRow(song: song, subtitle: song.artist + (song.duration > 0 ? " · " + song.timeLabel : ""), trailing: available ? "ellipsis" : "arrow.down.circle") {
+                    SongRow(song: song, subtitle: song.artist + (song.duration > 0 ? " · " + song.timeLabel : ""), trailing: available ? "ellipsis" : "arrow.down.circle", allowsPreview: true) {
                         if let existing, available { player.start([existing], at: existing) } else { save = song }
                     } more: { if let existing, available { menu = existing } else { save = song } }
                     }
@@ -111,6 +111,8 @@ struct SongSearchResults: View {
                 } else { Text("ここまで\(search.results.count)曲を表示").font(.caption).foregroundStyle(Palette.secondary).padding(.vertical, 22) }
             }
         }.sheet(item: $save) { SaveSongSheet(song: $0, initialPlaylistIDs: destination?.initialPlaylistIDs ?? []) }.sheet(item: $menu) { SongActionsSheet(song: $0) }
+            .onDisappear { player.preview.stop() }
+            .onChange(of: save?.id) { _, value in if value != nil { player.preview.stop() } }
     }
 }
 struct CatalogSearchResults: View {
@@ -177,7 +179,7 @@ struct RemoteCollectionView: View {
                     ForEach(store.songs) { song in
                         let existing = library.song(song.id)
                         let available = existing.map(library.isAvailable) ?? false
-                        SongRow(song: song, trailing: available ? "ellipsis" : "arrow.down.circle") {
+                        SongRow(song: song, trailing: available ? "ellipsis" : "arrow.down.circle", allowsPreview: true) {
                             if let existing, available { player.start(store.songs.compactMap { library.song($0.id) }.filter(library.isAvailable), at: existing) }
                             else { save = song }
                         } more: { if let existing, available { menu = existing } else { save = song } }
@@ -189,6 +191,8 @@ struct RemoteCollectionView: View {
             .toolbar(.visible, for: .navigationBar).toolbarBackground(Palette.background, for: .navigationBar)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { IconButton(symbol: "arrow.down.circle", label: "保存の状況") { showDownloads = true } } }
             .task { if !store.loaded { await store.open(item) } }
+            .onDisappear { player.preview.stop() }
+            .onChange(of: save?.id) { _, value in if value != nil { player.preview.stop() } }
             .sheet(item: $save) { SaveSongSheet(song: $0) }.sheet(item: $menu) { SongActionsSheet(song: $0) }
             .sheet(isPresented: $showDownloads) { DownloadsView() }
             .sheet(isPresented: $confirm, onDismiss: {

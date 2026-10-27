@@ -103,5 +103,36 @@ class EngineTests(unittest.TestCase):
                 result = json.loads(engine.dispatch(json.dumps({"op": "search", "query": "Song", "offset": offset})))
                 self.assertFalse(result["ok"])
 
+    def test_preview_uses_named_chorus_and_respects_chapter_end(self):
+        result = engine.preview_window({"duration": 200, "chapters": [
+            {"title": "Pre-Chorus", "start_time": 30},
+            {"title": "サビ", "start_time": 48, "end_time": 58}]})
+        self.assertEqual(result, {"preview_start": 48, "preview_end": 58, "preview_kind": "chorus"})
+
+    def test_preview_fallback_short_unknown_and_invalid_chapters(self):
+        for duration, start, end in [(200, 80, 95), (20, 5, 20), (7, 0, 7), (None, 0, 15)]:
+            result = engine.preview_window({"duration": duration, "chapters": [None,
+                {"title": "サビ前", "start_time": 2}, {"title": "Chorus", "start_time": float("nan")},
+                {"title": "Chorus", "start_time": -1}]})
+            self.assertEqual((result["preview_start"], result["preview_end"]), (start, end))
+            self.assertNotEqual(result["preview_kind"], "chorus")
+        self.assertEqual(engine.preview_window({"duration": 30, "chapters": [
+            {"title": "Chorus", "start_time": 100}]} )["preview_start"], 12)
+
+    def test_preview_resolves_without_download_or_lower_quality(self):
+        calls = []
+        info = self.info([self.format(abr=64), self.format(abr=128)])
+        class FakeYDL:
+            def __init__(self, options): calls.append(options)
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def extract_info(self, query, download):
+                calls.append((query, download)); return info
+        with patch.dict(sys.modules, {"yt_dlp": types.SimpleNamespace(YoutubeDL=FakeYDL), "certifi": types.SimpleNamespace(where=lambda: "ca.pem")}):
+            result = json.loads(engine.dispatch(json.dumps({"op": "preview", "id": ID})))
+        self.assertTrue(result["ok"]); self.assertEqual(result["bitrate"], 128)
+        self.assertEqual(result["song"], engine.song(info)); self.assertTrue(calls[0]["skip_download"])
+        self.assertFalse(calls[1][1]); self.assertEqual(result["preview_end"] - result["preview_start"], 15)
+
 
 if __name__ == "__main__": unittest.main()

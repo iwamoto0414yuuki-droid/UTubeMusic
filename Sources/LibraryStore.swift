@@ -72,6 +72,18 @@ final class LibraryStore: ObservableObject {
             }
         }
     }
+    /// Only update the index. Repair never writes, replaces, or deletes audio files.
+    func updateAudioDuration(_ id: String, expectedFileName: String, duration: Double) throws {
+        guard duration.isFinite, duration > 0, let current = song(id), current.fileName == expectedFileName else {
+            throw AppFailure("曲の状態が変わったため再生時間の更新を中止しました。")
+        }
+        try commit {
+            if let index = songs.firstIndex(where: { $0.id == id }) {
+                songs[index].duration = duration
+                songs[index].audioTimingVersion = 1
+            }
+        }
+    }
     @discardableResult func createPlaylist(_ name: String) throws -> UUID {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw AppFailure("プレイリスト名を入力してください。") }
