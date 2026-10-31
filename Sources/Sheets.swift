@@ -116,13 +116,13 @@ struct BatchSaveSheet: View {
                     Toggle(isOn: $favorite) { Label("全曲をお気に入りにも追加", systemImage: "heart") }.tint(Palette.accent)
                     Text("お気に入りに入れず、プレイリストだけにまとめることもできます。")
                         .font(.caption).foregroundStyle(Palette.secondary)
-                    Text("保存済みの曲は再利用し、新しい曲は1曲ずつ保存します。途中で止めても、保存済みの曲は残ります。取得できない曲は「保存の状況」から再試行できます。")
+                    Text(download ? "音声を1曲ずつ保存します。中止しても完了済みの曲は残ります。" : "音声はダウンロードせず、曲の情報だけを登録します。再生にはインターネット接続が必要です。")
                         .font(.subheadline).foregroundStyle(Palette.secondary).lineSpacing(5)
                     Text("保存が終わるまでアプリを開いてください。保存する権利・許可のある曲を対象にしてください。")
                         .font(.caption).foregroundStyle(Palette.secondary)
                 }.padding(24)
             }.background(Palette.background).foregroundStyle(Palette.text)
-                .navigationTitle("まとめて保存").navigationBarTitleDisplayMode(.inline)
+                .navigationTitle("まとめて追加").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("閉じる") { dismiss() } } }
                 .safeAreaInset(edge: .bottom) {
                     PrimaryButton(title: download ? "\(songs.count)曲をダウンロード" : "\(songs.count)曲を追加", symbol: "plus") {

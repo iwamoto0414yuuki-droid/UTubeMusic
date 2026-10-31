@@ -107,7 +107,7 @@ struct CollectionView: View {
             VStack(alignment: .leading, spacing: 22) {
                 PlaylistArtwork(name: "お気に入り", favorite: favorites, size: 210).frame(maxWidth: .infinity).padding(.vertical, 20)
                 Text(favorites ? "お気に入りの曲" : "保存した曲").font(.largeTitle.bold())
-                Text("\(songs.count)曲 · オフラインで再生").font(.caption).foregroundStyle(Palette.secondary)
+                Text("\(songs.count)曲 · " + (songs.allSatisfy(library.isAvailable) ? "オフラインで再生" : "オンライン曲は通信して再生")).font(.caption).foregroundStyle(Palette.secondary)
                 HStack {
                     PrimaryButton(title: "再生", symbol: "play.fill") { if let first = songs.first { player.start(songs, at: first) } }
                     IconButton(symbol: "shuffle", label: "シャッフル再生", color: Palette.accent) { if let song = songs.randomElement() { player.start(songs, at: song, shuffle: true) } }

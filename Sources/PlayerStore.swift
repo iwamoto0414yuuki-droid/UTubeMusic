@@ -38,6 +38,7 @@ final class PlayerStore: ObservableObject {
          streamItem: @escaping (URL, [String: Any]) -> AVPlayerItem = { AVPlayerItem(asset: AVURLAsset(url: $0, options: $1)) }) {
         self.request = request; self.streamItem = streamItem
         self.library = library
+        player.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
         do { try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default) }
         catch { self.error = error.localizedDescription }
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in

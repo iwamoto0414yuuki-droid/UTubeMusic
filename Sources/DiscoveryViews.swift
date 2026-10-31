@@ -99,7 +99,7 @@ struct SongSearchResults: View {
                     if let destination, let existing, available {
                         DestinationSongRow(song: existing, destination: destination)
                     } else {
-                    SongRow(song: song, subtitle: song.artist + (song.duration > 0 ? " · " + song.timeLabel : ""), trailing: available ? "ellipsis" : "arrow.down.circle", allowsPreview: true) {
+                    SongRow(song: song, subtitle: song.artist + (song.duration > 0 ? " · " + song.timeLabel : ""), trailing: available ? "ellipsis" : "plus.circle", allowsPreview: true) {
                         if let existing, available { player.start([existing], at: existing) } else { save = song }
                     } more: { if let existing, available { menu = existing } else { save = song } }
                     }
@@ -172,14 +172,14 @@ struct RemoteCollectionView: View {
                     PrimaryButton(title: "もう一度読み込む") { Task { await store.open(item) } }
                 } else {
                     Text("\(store.songs.count)曲 · " + Song.clock(store.songs.reduce(0) { $0 + $1.duration })).font(.caption).foregroundStyle(Palette.secondary)
-                    PrimaryButton(title: "まとめて保存", symbol: "arrow.down.circle") { confirm = true }.disabled(store.songs.isEmpty || library.recoveryNeeded)
-                    Text("同じ名前のプレイリストをこのiPhoneに作成します。保存済みの曲は再ダウンロードしません。")
+                    PrimaryButton(title: "まとめて追加", symbol: "arrow.down.circle") { confirm = true }.disabled(store.songs.isEmpty || library.recoveryNeeded)
+                    Text("曲の情報だけ追加するか、音声もダウンロードするか選べます。")
                         .font(.caption).foregroundStyle(Palette.secondary).lineSpacing(3)
                     if store.unavailable > 0 { Text("非公開・再生不可・重複などの\(store.unavailable)件は一覧から除外しています。") .font(.caption).foregroundStyle(Palette.secondary) }
                     ForEach(store.songs) { song in
                         let existing = library.song(song.id)
                         let available = existing.map(library.isPlayable) ?? false
-                        SongRow(song: song, trailing: available ? "ellipsis" : "arrow.down.circle", allowsPreview: true) {
+                        SongRow(song: song, trailing: available ? "ellipsis" : "plus.circle", allowsPreview: true) {
                             if let existing, available { player.start(store.songs.compactMap { library.song($0.id) }.filter(library.isPlayable), at: existing) }
                             else { save = song }
                         } more: { if let existing, available { menu = existing } else { save = song } }
