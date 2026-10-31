@@ -12,14 +12,17 @@ enum Loudness {
     }
     static func read(_ url: URL) async throws -> Double? {
         let work = Task.detached(priority: .userInitiated) { () throws -> Double? in
-            let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
+            let file = try AVAudioFile(forReading: url)
             let format = file.processingFormat
             guard (1...2).contains(Int(format.channelCount)), (8000...192000).contains(format.sampleRate),
                   let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 8192) else { return nil }
             var meter = LoudnessMeter(rate: format.sampleRate, channels: Int(format.channelCount))
-            while true {
+            while file.framePosition < file.length {
                 try Task.checkCancellation()
-                try file.read(into: buffer)
+                let remaining = file.length - file.framePosition
+                let count = AVAudioFrameCount(min(AVAudioFramePosition(buffer.frameCapacity), remaining))
+                do { try file.read(into: buffer, frameCount: count) }
+                catch { throw AppFailure("音量測定のPCM読取に失敗（位置 \(file.framePosition) / \(file.length)）：\(error.localizedDescription)") }
                 guard buffer.frameLength > 0 else { break }
                 guard let data = buffer.floatChannelData else { return nil }
                 for frame in 0..<Int(buffer.frameLength) {

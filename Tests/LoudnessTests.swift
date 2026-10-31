@@ -39,8 +39,7 @@ final class LoudnessPlaybackTests: XCTestCase {
         let store = LibraryStore(root: root)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         let url = root.appendingPathComponent("tone.wav")
-        // Write a canonical PCM WAV directly. AVAudioFile's writer can keep its
-        // header unfinalized until an autorelease pool drains in the test host.
+        // A canonical PCM WAV independent of the decoder under test.
         var data = Data()
         func word<T: FixedWidthInteger>(_ value: T) {
             var little = value.littleEndian
