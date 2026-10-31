@@ -5,6 +5,16 @@ import AVFoundation
 
 @MainActor
 final class ScreenCaptureTests: XCTestCase {
+    func testCaptureBulkDownloadSelection() async throws {
+        let (library, player, music, old) = try playableLibrary()
+        defer { player.pause() }
+        let ids = ["00000000001", "00000000002", "00000000003"]
+        for (index, id) in ids.enumerated() {
+            try library.save(Song(id: id, title: "お気に入りの曲 \(index + 1)", artist: "画面確認用", duration: old.duration, fileName: old.fileName, favorite: true), playlistIDs: [])
+        }
+        try await render(NavigationStack { LibraryView(initialFilter: 3, initialSelection: true, initialSelectedIDs: Set(ids.prefix(2))) }
+            .environmentObject(library).environmentObject(player).environmentObject(music), name: "native-download-selection")
+    }
     func testCaptureDownloadedLibrary() async throws {
         let (library, player, music, _) = try playableLibrary()
         defer { player.pause() }

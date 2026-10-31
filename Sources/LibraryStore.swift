@@ -1,6 +1,12 @@
 import Foundation
 import AVFoundation
 
+struct DownloadRemovalReport {
+    var removed: [String] = []
+    var failures: [String] = []
+    var cancelled = false
+}
+
 @MainActor
 final class LibraryStore: ObservableObject {
     @Published private(set) var songs: [Song] = []
@@ -76,6 +82,25 @@ final class LibraryStore: ObservableObject {
             catch { throw AppFailure("音声ファイルの削除と登録情報の復元に失敗しました。音声ファイルは残っています。ファイルアプリで確認してください。") }
             throw AppFailure("音声ファイルを削除できなかったため、ダウンロード済みの状態に戻しました。")
         }
+    }
+    func removeDownloads(_ ids: [String], didRemove: (String) -> Void = { _ in },
+                         progress: (Int, Int) -> Void = { _, _ in }) async -> DownloadRemovalReport {
+        var seen = Set<String>()
+        let unique = ids.filter { seen.insert($0).inserted }
+        var result = DownloadRemovalReport()
+        for (index, id) in unique.enumerated() {
+            guard !Task.isCancelled else { result.cancelled = true; break }
+            do {
+                try removeDownload(id)
+                result.removed.append(id)
+                didRemove(id)
+            } catch { result.failures.append("\(song(id)?.title ?? id)：\(error.localizedDescription)") }
+            progress(index + 1, unique.count)
+            // Commit and remove one file at a time, allowing cancellation without
+            // losing the memberships of completed, failed or remaining songs.
+            await Task.yield()
+        }
+        return result
     }
     func addOnline(_ song: Song, favorite: Bool, playlistIDs: Set<UUID>) throws {
         var value = self.song(song.id) ?? song

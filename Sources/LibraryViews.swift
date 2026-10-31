@@ -8,7 +8,22 @@ struct LibraryView: View {
     @State private var newPlaylist = false
     @State private var name = ""
     @State private var selected: Song?
-    init(initialFilter: Int = 0) { _filter = State(initialValue: initialFilter) }
+    @State private var selecting = false
+    @State private var chosen = Set<String>()
+    @State private var confirmRemoval = false
+    @State private var pendingRemoval: [String] = []
+    @State private var removing = false
+    @State private var completed = 0
+    @State private var total = 0
+    @State private var showResult = false
+    @State private var resultText = ""
+    @State private var removalTask: Task<Void, Never>?
+    init(initialFilter: Int = 0, initialSelection: Bool = false, initialSelectedIDs: Set<String> = []) {
+        _filter = State(initialValue: initialFilter)
+        _selecting = State(initialValue: initialSelection)
+        _chosen = State(initialValue: initialSelectedIDs)
+    }
+    private var eligibleIDs: Set<String> { Set(visibleSongs.filter(library.canRemoveDownload).map(\.id)) }
     private var visibleSongs: [Song] {
         let songs = filter == 1 ? library.favorites : filter == 3 ? library.songs.filter(library.isAvailable) : library.songs
         return text.isEmpty ? songs : songs.filter { $0.title.localizedCaseInsensitiveContains(text) || $0.artist.localizedCaseInsensitiveContains(text) }
@@ -19,7 +34,13 @@ struct LibraryView: View {
                 HStack {
                     Text("ライブラリ").font(.largeTitle.bold())
                     Spacer()
-                    IconButton(symbol: "plus", label: "プレイリストを作成") { name = ""; newPlaylist = true }
+                    if filter == 3 {
+                        Button(selecting ? "完了" : "選択") { selecting.toggle(); chosen = [] }
+                            .font(.subheadline.bold()).frame(minHeight: 44)
+                            .disabled(removing || (!selecting && eligibleIDs.isEmpty))
+                    } else {
+                        IconButton(symbol: "plus", label: "プレイリストを作成") { name = ""; newPlaylist = true }
+                    }
                 }.padding(.top, 12)
                 ScrollViewReader { proxy in
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -39,6 +60,16 @@ struct LibraryView: View {
                 if filter == 3 {
                     Text("このiPhoneに音声がある曲だけを表示します。YouTubeから保存した曲は、メニューの「ダウンロードだけ削除」で、お気に入り・プレイリストに残したままオンライン再生に切り替えられます。")
                         .font(.caption).foregroundStyle(Palette.secondary).lineSpacing(3)
+                    if selecting {
+                        HStack {
+                            Text("\(chosen.count)曲を選択中").font(.subheadline.bold())
+                            Spacer()
+                            Button(!eligibleIDs.isEmpty && eligibleIDs.isSubset(of: chosen) ? "選択を解除" : (text.isEmpty ? "すべて選択" : "検索結果をすべて選択")) {
+                                if eligibleIDs.isSubset(of: chosen) { chosen.subtract(eligibleIDs) }
+                                else { chosen.formUnion(eligibleIDs) }
+                            }.font(.subheadline.bold()).frame(minHeight: 44).disabled(eligibleIDs.isEmpty)
+                        }
+                    }
                 }
                 if filter == 0 && text.isEmpty || filter == 2 {
                     NavigationLink { CollectionView(favorites: true) } label: {
@@ -79,15 +110,63 @@ struct LibraryView: View {
                     } else {
                         LazyVStack(spacing: 3) {
                             ForEach(visibleSongs) { song in
+                                if filter == 3 && selecting {
+                                    Button {
+                                        if chosen.contains(song.id) { chosen.remove(song.id) } else { chosen.insert(song.id) }
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: chosen.contains(song.id) ? "checkmark.circle.fill" : "circle")
+                                                .font(.title2).foregroundStyle(chosen.contains(song.id) ? Palette.accent : Palette.secondary)
+                                            SongArtwork(song: song, size: 48)
+                                            VStack(alignment: .leading, spacing: 5) {
+                                                Text(song.title).font(.subheadline.weight(.semibold)).lineLimit(2)
+                                                Text(library.canRemoveDownload(song) ? song.artist : "読み込んだ音声・オンライン切替の対象外")
+                                                    .font(.caption).foregroundStyle(Palette.secondary).lineLimit(1)
+                                            }
+                                            Spacer(minLength: 0)
+                                        }.foregroundStyle(Palette.text).padding(.vertical, 8).contentShape(Rectangle())
+                                    }.buttonStyle(.plain).disabled(!library.canRemoveDownload(song))
+                                        .opacity(library.canRemoveDownload(song) ? 1 : 0.5)
+                                        .accessibilityAddTraits(chosen.contains(song.id) ? .isSelected : [])
+                                } else {
                                 SongRow(song: song, subtitle: library.isPlayable(song) ? song.artist + (library.isAvailable(song) ? " · ダウンロード済み" : " · オンライン") : "ファイルが見つかりません・再保存してください") {
                                     player.start(visibleSongs, at: song)
                                 } more: { selected = song }
+                                }
                             }
                         }
                     }
                 }
             }.padding(.horizontal, 20).padding(.bottom, 24)
         }.foregroundStyle(Palette.text).scrollIndicators(.hidden)
+            .disabled(removing)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if selecting && filter == 3 {
+                    VStack(spacing: 10) {
+                        if removing {
+                            ProgressView(value: Double(completed), total: Double(max(1, total))).tint(Palette.accent)
+                            HStack {
+                                Text("\(completed) / \(total)曲を処理中").font(.caption)
+                                Spacer()
+                                Button("中止") { removalTask?.cancel() }.frame(minHeight: 44)
+                            }
+                        } else {
+                            Text("お気に入り・プレイリスト・曲順は残ります").font(.caption).foregroundStyle(Palette.secondary)
+                            PrimaryButton(title: "\(chosen.count)曲のダウンロードだけ削除", symbol: "arrow.down.circle") {
+                                pendingRemoval = library.songs.filter { chosen.contains($0.id) }.map(\.id)
+                                confirmRemoval = true
+                            }.disabled(chosen.isEmpty)
+                        }
+                    }.padding(16).foregroundStyle(Palette.text).background(Palette.background)
+                }
+            }
+            .onChange(of: filter) { _, _ in if !removing { selecting = false; chosen = [] } }
+            .onChange(of: text) { _, _ in if !removing { chosen = [] } }
+            .onDisappear { removalTask?.cancel() }
+            .confirmationDialog("\(pendingRemoval.count)曲の音声ファイルだけを削除しますか？お気に入り・プレイリスト・曲順・ジャケットは残り、オンライン再生に切り替わります。再生中の対象曲は停止します。", isPresented: $confirmRemoval, titleVisibility: .visible) {
+                Button("\(pendingRemoval.count)曲のダウンロードだけ削除", role: .destructive) { removeSelectedDownloads() }
+            }
+            .alert("ダウンロード削除の結果", isPresented: $showResult) { Button("OK", role: .cancel) {} } message: { Text(resultText) }
             .sheet(item: $selected) { SongActionsSheet(song: $0) }
             .alert("新しいプレイリスト", isPresented: $newPlaylist) {
                 TextField("プレイリスト名", text: $name)
@@ -96,6 +175,24 @@ struct LibraryView: View {
                     do { try library.createPlaylist(name) } catch { library.message = error.localizedDescription }
                 }
             }
+    }
+    private func removeSelectedDownloads() {
+        let ids = pendingRemoval
+        removing = true; completed = 0; total = ids.count
+        removalTask = Task { @MainActor in
+            let result = await library.removeDownloads(ids, didRemove: { player.releaseRemovedDownload($0) }, progress: { completed = $0; total = $1 })
+            chosen.subtract(result.removed)
+            chosen = chosen.intersection(Set(library.songs.filter { library.canRemoveDownload($0) && library.isAvailable($0) }.map(\.id)))
+            removing = false
+            if chosen.isEmpty { selecting = false }
+            resultText = "\(result.removed.count)曲のダウンロードを削除しました。お気に入り・プレイリストは残っています。"
+            if result.cancelled { resultText += "\n中止しました。未処理の曲はダウンロード済みのままです。" }
+            if !result.failures.isEmpty {
+                resultText += "\n\(result.failures.count)曲は削除できませんでした。\n" + result.failures.prefix(5).joined(separator: "\n")
+                if result.failures.count > 5 { resultText += "\nほか\(result.failures.count - 5)曲" }
+            }
+            showResult = true; removalTask = nil
+        }
     }
     private func chip(_ title: String, value: Int) -> some View {
         Button { filter = value } label: {
