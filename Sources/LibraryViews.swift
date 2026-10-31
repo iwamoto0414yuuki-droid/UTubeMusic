@@ -21,11 +21,13 @@ struct LibraryView: View {
                     Spacer()
                     IconButton(symbol: "plus", label: "プレイリストを作成") { name = ""; newPlaylist = true }
                 }.padding(.top, 12)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        chip("すべて", value: 0); chip("お気に入り", value: 1)
-                        chip("プレイリスト", value: 2); chip("ダウンロード済み", value: 3)
-                    }
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            chip("すべて", value: 0); chip("お気に入り", value: 1)
+                            chip("プレイリスト", value: 2); chip("ダウンロード済み", value: 3)
+                        }
+                    }.onChange(of: filter, initial: true) { _, value in proxy.scrollTo(value, anchor: .center) }
                 }
                 if filter != 2 {
                     HStack {
@@ -100,7 +102,7 @@ struct LibraryView: View {
             Text(title).font(.system(size: 13, weight: .semibold)).padding(.horizontal, 17).frame(minHeight: 44)
                 .background(filter == value ? Palette.text : Palette.raised, in: Capsule())
                 .foregroundStyle(filter == value ? Color.black : Palette.text)
-        }.buttonStyle(.plain).accessibilityAddTraits(filter == value ? .isSelected : [])
+        }.buttonStyle(.plain).id(value).accessibilityAddTraits(filter == value ? .isSelected : [])
     }
 }
 

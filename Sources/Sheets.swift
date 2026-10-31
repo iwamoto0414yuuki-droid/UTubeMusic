@@ -157,7 +157,7 @@ struct SongActionsSheet: View {
                 }
                 if library.canRemoveDownload(library.song(song.id) ?? song) {
                     Button { removeDownload = true } label: {
-                        Label("ダウンロードだけ削除", systemImage: "arrow.down.circle.badge.xmark")
+                        Label("ダウンロードだけ削除", systemImage: "arrow.down.circle")
                     }.accessibilityIdentifier("remove-download")
                 }
                 Button { player.start(library.songs, at: song); dismiss() } label: { Label("再生", systemImage: "play.fill") }.disabled(!library.isPlayable(song))
