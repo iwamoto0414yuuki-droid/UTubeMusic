@@ -145,6 +145,7 @@ final class MusicService: ObservableObject {
                 jobs[index].song.favorite = jobs[index].song.favorite || favorite
             } else { save(song, favorite: favorite, playlistIDs: [playlistID]) }
         }
+        if !download { library.message = "曲を追加しました。再生には通信が必要です。"; return }
         let remaining = songs.filter { library.song($0.id).map(library.isAvailable) != true }.count
         library.message = remaining == 0 ? "\(songs.count)曲を「\(title)」に追加しました。すべて保存済みです。" : "「\(title)」にまとめます。未保存の\(remaining)曲は順番に保存します。"
     }
