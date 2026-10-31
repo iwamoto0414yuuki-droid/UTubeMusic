@@ -1,6 +1,17 @@
+# 0.3.2：複数のダウンロードをまとめて削除
+
+アプリを削除せず、SideStoreで `UTubeMusic-0.3.2-unsigned.ipa` を上書き更新してください。
+
+1. 「ライブラリ」→「ダウンロード済み」→右上の「選択」を押す。
+2. 曲を複数チェックするか、「すべて選択」を押す。検索してから選ぶと、その検索結果だけを選べます。
+3. 下部の「N曲のダウンロードだけ削除」を押し、確認して実行する。
+4. 結果の件数を確認する。途中で「中止」した場合、未処理の曲はダウンロード済みのままです。
+
+お気に入り・プレイリスト・曲順・ジャケット・曲情報を残し、音声ファイルだけを削除してオンライン再生に切り替えます。再生中の対象曲は停止します。手動で読み込んだ音声は対象外です。「ライブラリから削除」とは異なります。
+
 # 0.3.1：ダウンロードだけ削除する
 
-今のアプリは削除せず、同じApple AccountのSideStoreで `UTubeMusic-0.3.1-unsigned.ipa` を上書き更新します。
+今のアプリは削除せず、同じApple AccountのSideStoreで `UTubeMusic-0.3.2-unsigned.ipa` を上書き更新します。
 
 1. ライブラリのフィルターを横にスクロールして「ダウンロード済み」を選ぶ（通常のライブラリ・お気に入り・プレイリストからでも操作できます）。
 2. 曲の「…」→「ダウンロードだけ削除」→確認画面の同名ボタンを押す。
@@ -14,7 +25,7 @@
 
 # 0.3.0更新時の確認
 
-今のアプリは削除せず、同じApple AccountのSideStoreで `UTubeMusic-0.3.1-unsigned.ipa` を上書きします。更新前にファイルアプリでUTubeMusicフォルダーをコピーしておくと復元に使えます。
+今のアプリは削除せず、同じApple AccountのSideStoreで `UTubeMusic-0.3.2-unsigned.ipa` を上書きします。更新前にファイルアプリでUTubeMusicフォルダーをコピーしておくと復元に使えます。
 
 - 検索欄へ「安室」と入力して少し待つ → 候補から「安室奈美恵」を選んで検索。
 - 曲を追加するとき「オフライン用にもダウンロード」をオフのまま追加 → ライブラリの「オンライン」表示を確認して再生。
@@ -33,7 +44,7 @@
 ## 導入済みの方：0.3.0へ更新
 
 1. 念のため「ファイル」→「このiPhone内」→「UTube Music」→「UTubeMusic」をフォルダーごとコピーしておく。
-2. 新しい `release/UTubeMusic-0.3.1-unsigned.ipa` をiPhoneの「ファイル」へ渡す。
+2. 新しい `release/UTubeMusic-0.3.2-unsigned.ipa` をiPhoneの「ファイル」へ渡す。
 3. Wi-FiとLocalDevVPNをオンにし、前回と同じApple AccountのSideStoreで＋から新しいIPAを選ぶ。
 4. 既存のUTube Musicへ上書き更新する。**先にアプリを削除しない。** 同じアプリIDで曲・プレイリストを引き継ぐ構成です。
 5. 設定のバージョンが0.3.0になり、保存した曲が残っていることを確認する。
@@ -67,9 +78,9 @@ iPhoneで[LocalDevVPNのApp Storeページ](https://apps.apple.com/jp/app/locald
 
 ## 3. UTube MusicのIPAを入れる
 
-**0.3.0のIPAを生成し、67件のテストと実機向けARM64ビルドに成功しました。** Windows側の `release/UTubeMusic-0.3.1-unsigned.ipa` を使います。個人用の開発版です。更新後の実機確認は必要です。ソースコードZIPはインストールできません。
+実機向けARM64ビルドのIPAを使用します。 Windows側の `release/UTubeMusic-0.3.2-unsigned.ipa` を使います。個人用の開発版です。更新後の実機確認は必要です。ソースコードZIPはインストールできません。
 
-1. Windowsにある `UTubeMusic-0.3.1-unsigned.ipa` を、ご自身のiCloud Driveや普段使うファイル転送手段でiPhoneの「ファイル」アプリへ渡す。メールなどで他人へ配布する必要はありません。
+1. Windowsにある `UTubeMusic-0.3.2-unsigned.ipa` を、ご自身のiCloud Driveや普段使うファイル転送手段でiPhoneの「ファイル」アプリへ渡す。メールなどで他人へ配布する必要はありません。
 2. iPhoneをWi-Fiへ接続し、LocalDevVPNをConnectにする。
 3. SideStore → My Apps → 追加（＋）からIPAを選択し、署名・インストールが終わるまで待つ。
 4. ホーム画面の「UTube Music」を開く。
