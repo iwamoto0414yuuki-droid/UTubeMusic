@@ -13,8 +13,10 @@ struct Song: Identifiable, Codable, Equatable {
     var addedAt = Date()
     var onlineOnly: Bool? = nil
     var audioTimingVersion: Int? = nil
+    var measuredLoudness: Double? = nil
+    var loudnessFileName: String? = nil
+    var sourceLoudnessDB: Double? = nil
 
-    var sourceURL: String { "https://www.youtube.com/watch?v=\(id)" }
     var timeLabel: String { Self.clock(duration) }
     static func clock(_ time: Double) -> String {
         guard time.isFinite, time >= 0 else { return "0:00" }

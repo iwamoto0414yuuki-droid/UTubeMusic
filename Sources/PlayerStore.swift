@@ -10,6 +10,22 @@ final class PlayerStore: ObservableObject {
     @Published private(set) var duration: Double = 0
     @Published private(set) var queue = PlaybackQueue()
     @Published var error: String?
+    @Published var normalizeVolume = UserDefaults.standard.object(forKey: "normalizeVolume") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(normalizeVolume, forKey: "normalizeVolume")
+            player.volume = normalizeVolume ? normalizedVolume : 1
+            preview.normalizationEnabled = normalizeVolume
+            if normalizeVolume, let current, library.isAvailable(current), current.loudnessFileName != current.fileName {
+                let position = elapsed, resume = playing
+                load(current, autoplay: resume); seek(position)
+            }
+        }
+    }
+    private var normalizedVolume: Float = 1
+    private var volumeTask: Task<Void, Never>?
+    @Published private(set) var preparingVolume = false
+    private var playAfterVolume = false
+    var playbackVolume: Float { player.volume }
     private let player = AVPlayer()
     private let request: ([String: String]) async throws -> EngineResponse
     private let streamItem: (URL, [String: Any]) -> AVPlayerItem
@@ -30,6 +46,7 @@ final class PlayerStore: ObservableObject {
     func togglePreview(_ song: Song) {
         let saved = library.song(song.id)
         let local = saved.flatMap { library.isAvailable($0) ? library.file($0.fileName) : nil }
+        preview.normalizationEnabled = normalizeVolume
         preview.toggle(song, localURL: local)
     }
 
@@ -93,15 +110,17 @@ final class PlayerStore: ObservableObject {
         preview.stop(resume: false)
         guard let current else { return }
         if player.currentItem == nil, current.onlineOnly == true { load(current); return }
+        if preparingVolume { playAfterVolume = true; return }
         if duration > 0 && elapsed >= duration - 0.1 { seek(0) }
         do {
             try AVAudioSession.sharedInstance().setActive(true)
             player.play(); playing = true; updateNowPlaying()
         } catch { self.error = error.localizedDescription }
     }
-    private func pauseMain() { player.pause(); playing = false; updateNowPlaying() }
+    private func pauseMain() { playAfterVolume = false; player.pause(); playing = false; updateNowPlaying() }
     func pause() { streamGeneration = UUID(); streamTask?.cancel(); preview.stop(resume: false); pauseMain() }
     func toggle() {
+        if preparingVolume { playAfterVolume ? pause() : play(); return }
         if preview.song != nil { preview.stop(resume: false) }
         else { playing ? pause() : play() }
     }
@@ -138,7 +157,7 @@ final class PlayerStore: ObservableObject {
         let wasCurrent = current?.id == id
         queue.remove(id)
         if wasCurrent {
-            pause(); player.replaceCurrentItem(with: nil); current = nil; elapsed = 0; duration = 0
+            pause(); volumeTask?.cancel(); preparingVolume = false; player.replaceCurrentItem(with: nil); current = nil; elapsed = 0; duration = 0
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             if let next = queue.current, let song = library.song(next), library.isPlayable(song) { load(song) }
         }
@@ -154,6 +173,7 @@ final class PlayerStore: ObservableObject {
         if preview.song?.id == id { preview.stop(resume: current?.id != id) }
         guard current?.id == id else { return }
         pause()
+        volumeTask?.cancel(); preparingVolume = false
         durationTask?.cancel(); statusObservation = nil
         player.replaceCurrentItem(with: nil)
         current = library.song(id)
@@ -166,6 +186,8 @@ final class PlayerStore: ObservableObject {
         preview.stop(resume: false)
         let song = library.song(song.id) ?? song
         streamGeneration = UUID(); streamTask?.cancel()
+        volumeTask?.cancel(); preparingVolume = false; playAfterVolume = false
+        normalizedVolume = 1; player.volume = 1
         if !library.isAvailable(song), song.onlineOnly == true {
             loadOnline(song, autoplay: autoplay); return
         }
@@ -212,7 +234,26 @@ final class PlayerStore: ObservableObject {
                 if failed { self.pause(); self.error = detail ?? "この曲を再生できません。" }
             }
         }
-        if autoplay { play() } else { playing = false; updateNowPlaying() }
+        playing = false
+        if normalizeVolume, song.loudnessFileName != song.fileName {
+            preparingVolume = true; playAfterVolume = autoplay
+            volumeTask = Task { [weak self, weak item] in
+                let lufs: Double?, measured: Bool
+                do { lufs = try await Loudness.read(url); measured = true }
+                catch { lufs = nil; measured = false }
+                guard !Task.isCancelled, let self, let item, self.player.currentItem === item else { return }
+                self.normalizedVolume = Loudness.volume(lufs: lufs)
+                self.player.volume = self.normalizeVolume ? self.normalizedVolume : 1
+                if measured, let name = song.fileName { try? self.library.cacheLoudness(song.id, fileName: name, lufs: lufs) }
+                self.preparingVolume = false
+                if self.playAfterVolume { self.play() }
+                self.updateNowPlaying()
+            }
+        } else {
+            normalizedVolume = Loudness.volume(lufs: song.measuredLoudness)
+            player.volume = normalizeVolume ? normalizedVolume : 1
+            if autoplay { play() } else { updateNowPlaying() }
+        }
     }
     private func loadOnline(_ song: Song, autoplay: Bool) {
         let token = streamGeneration
@@ -230,6 +271,9 @@ final class PlayerStore: ObservableObject {
                       url.host?.hasSuffix(".googlevideo.com") == true else { throw AppFailure("音声の取得先を確認できません。") }
                 var options: [String: Any] = [:]
                 if let agent = response.headers?.first(where: { $0.key.lowercased() == "user-agent" })?.value { options[AVURLAssetHTTPUserAgentKey] = agent }
+                self.normalizedVolume = Loudness.sourceVolume(response.loudness_db ?? song.sourceLoudnessDB)
+                self.player.volume = self.normalizeVolume ? self.normalizedVolume : 1
+                try? self.library.cacheSourceLoudness(song.id, db: response.loudness_db)
                 let item = self.streamItem(url, options)
                 self.duration = response.song?.duration ?? song.duration
                 if self.duration > 0 { item.forwardPlaybackEndTime = CMTime(seconds: self.duration, preferredTimescale: 600) }

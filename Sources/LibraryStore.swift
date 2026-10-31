@@ -102,6 +102,18 @@ final class LibraryStore: ObservableObject {
         }
         return result
     }
+    func cacheLoudness(_ id: String, fileName: String, lufs: Double?) throws {
+        guard song(id)?.fileName == fileName, lufs == nil || (lufs!.isFinite && (-70...10).contains(lufs!)) else { return }
+        try commit {
+            if let i = songs.firstIndex(where: { $0.id == id }) {
+                songs[i].measuredLoudness = lufs; songs[i].loudnessFileName = fileName
+            }
+        }
+    }
+    func cacheSourceLoudness(_ id: String, db: Double?) throws {
+        guard let db, db.isFinite, (-60...60).contains(db), song(id)?.sourceLoudnessDB != db else { return }
+        try commit { if let i = songs.firstIndex(where: { $0.id == id }) { songs[i].sourceLoudnessDB = db } }
+    }
     func addOnline(_ song: Song, favorite: Bool, playlistIDs: Set<UUID>) throws {
         var value = self.song(song.id) ?? song
         if !isAvailable(value) { value.onlineOnly = true }

@@ -182,6 +182,8 @@ def dispatch(request_json):
             with YoutubeDL(options) as ydl:
                 info = ydl.extract_info("https://www.youtube.com/watch?v=" + ident, download=False)
             result = {"ok": True, **select_audio(info)}
+            import music_catalog
+            result["loudness_db"] = music_catalog.loudness(ident)
             if op == "preview":
                 result.update(preview_window(info))
             return json.dumps(result, ensure_ascii=False)

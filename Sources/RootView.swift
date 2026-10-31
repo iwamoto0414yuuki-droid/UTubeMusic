@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 @MainActor
 struct RootView: View {
@@ -65,7 +64,7 @@ struct RootView: View {
                                 SongArtwork(song: song, size: 42, radius: 6)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(song.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                                    Text(song.artist).font(.system(size: 11)).foregroundStyle(Palette.secondary).lineLimit(1)
+                                    Text(player.preparingVolume ? "音量を確認中…" : song.artist).font(.system(size: 11)).foregroundStyle(Palette.secondary).lineLimit(1)
                                 }
                                 Spacer(minLength: 0)
                             }.contentShape(Rectangle())

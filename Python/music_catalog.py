@@ -3,6 +3,43 @@ import re
 import urllib.parse
 
 
+def loudness(ident):
+    """Optional source reference level; failure must never block playback."""
+    try:
+        from ytmusicapi import YTMusic
+        import requests
+        import certifi
+        from functools import partial
+        with requests.Session() as session:
+            session.trust_env = False
+            session.verify = certifi.where()
+            session.request = partial(session.request, timeout=3)
+            data = YTMusic(requests_session=session).get_song(ident)
+            return loudness_value(data)
+    except Exception:
+        return None
+
+
+def loudness_value(data):
+    import math
+    try:
+        values = [data.get("playerConfig", {}).get("audioConfig", {}).get("loudnessDb")]
+        values += [f.get("loudnessDb") for f in data.get("streamingData", {}).get("adaptiveFormats", [])
+                   if isinstance(f, dict) and str(f.get("mimeType", "")).startswith("audio/mp4")]
+        for value in values:
+            if value is None or isinstance(value, bool):
+                continue
+            try:
+                value = float(value)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if math.isfinite(value) and -60 <= value <= 60:
+                return value
+    except (AttributeError, TypeError):
+        pass
+    return None
+
+
 def thumbnail(value):
     return next((t["url"] for t in reversed(value.get("thumbnails") or [])
                  if str(t.get("url", "")).startswith("https://")), None)

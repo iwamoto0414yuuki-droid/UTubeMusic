@@ -270,6 +270,11 @@ struct SettingsView: View {
                     LabeledContent("曲の容量", value: ByteCountFormatter.string(fromByteCount: library.totalBytes, countStyle: .file))
                     Button { importing = true } label: { Label("音声ファイルを読み込む", systemImage: "folder.badge.plus") }
                 } header: { Text("このiPhoneのライブラリ") }
+                Section("再生音量") {
+                    Toggle("曲ごとの音量差を抑える", isOn: $player.normalizeVolume)
+                    Text("大きい曲を−14 LUFSを目安に下げます。保存曲は初回再生前に端末内で測定し、オンライン曲は取得元の音量情報がある場合に調整します。小さい曲の増幅はしません。音源ファイルとiPhone本体の音量は変更しません。")
+                        .font(.caption).foregroundStyle(Palette.secondary)
+                }
                 Section("再生時間の修復") {
                     Button {
                         player.pause()
@@ -291,7 +296,7 @@ struct SettingsView: View {
                         .font(.subheadline).foregroundStyle(Palette.secondary)
                 }
                 Section {
-                    LabeledContent("バージョン", value: "0.3.2 開発版")
+                    LabeledContent("バージョン", value: "0.3.3 開発版")
                     Text("個人用の音楽ライブラリ。曲の取得はYouTubeの仕様や制限により失敗する場合があります。")
                         .font(.caption).foregroundStyle(Palette.secondary)
                     Text("Python / yt-dlp / yt-dlp-ejs / certifi / yt-dlp-apple-webkit-jsi / ytmusicapi / requests を使用。ライセンスはアプリ内の同梱ファイル ThirdPartyNotices を参照。")

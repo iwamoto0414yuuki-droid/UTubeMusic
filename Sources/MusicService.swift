@@ -28,6 +28,7 @@ struct EngineResponse: Decodable {
     let preview_start: Double?
     let preview_end: Double?
     let preview_kind: String?
+    let loudness_db: Double?
 }
 
 final class PythonService {
@@ -197,6 +198,7 @@ final class MusicService: ObservableObject {
             }
             try Task.checkCancellation()
             var song = metadata.song
+            song.sourceLoudnessDB = response.loudness_db
             let latest = jobs.first(where: { $0.id == id }) ?? job
             song.favorite = latest.song.favorite; song.duration = duration
             song.fileName = fileName; song.artworkName = artworkName

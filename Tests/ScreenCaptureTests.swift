@@ -5,6 +5,11 @@ import AVFoundation
 
 @MainActor
 final class ScreenCaptureTests: XCTestCase {
+    func testCaptureLoudnessSettings() async throws {
+        let (library, player, music, _) = try playableLibrary()
+        defer { player.pause() }
+        try await render(SettingsView().environmentObject(library).environmentObject(player).environmentObject(music), name: "native-settings")
+    }
     func testCaptureBulkDownloadSelection() async throws {
         let (library, player, music, old) = try playableLibrary()
         defer { player.pause() }
