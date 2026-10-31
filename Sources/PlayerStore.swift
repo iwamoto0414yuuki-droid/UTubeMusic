@@ -84,7 +84,7 @@ final class PlayerStore: ObservableObject {
         configureCommands()
     }
     func start(_ songs: [Song], at song: Song, shuffle: Bool = false) {
-        let available = songs.filter(library.isPlayable)
+        let available = songs.map { library.song($0.id) ?? $0 }.filter(library.isPlayable)
         guard available.contains(where: { $0.id == song.id }) else { error = "音声ファイルが見つかりません。検索からもう一度保存してください。"; return }
         queue.start(available.map(\.id), at: song.id, shuffle: shuffle)
         load(song)

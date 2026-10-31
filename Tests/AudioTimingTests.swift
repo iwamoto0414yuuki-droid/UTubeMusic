@@ -145,7 +145,8 @@ final class AudioTimingTests: XCTestCase {
         player.toggleRepeat(); player.toggleRepeat()
         XCTAssertEqual(player.queue.repeatMode, .one)
         player.seek(2.7); player.play()
-        try await Task.sleep(nanoseconds: 800_000_000)
+        let repeatDeadline = Date().addingTimeInterval(3)
+        while player.elapsed >= 2 && Date() < repeatDeadline { try await Task.sleep(nanoseconds: 20_000_000) }
         player.pause(); XCTAssertEqual(player.current?.id, second.id); XCTAssertLessThan(player.elapsed, 2)
         XCTAssertEqual(try Data(contentsOf: source), original)
     }
