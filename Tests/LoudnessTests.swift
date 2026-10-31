@@ -39,18 +39,33 @@ final class LoudnessPlaybackTests: XCTestCase {
         let store = LibraryStore(root: root)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         let url = root.appendingPathComponent("tone.wav")
-        do {
-            let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48000, channels: 1))
-            let file = try AVAudioFile(forWriting: url, settings: format.settings)
-            let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 48000))
-            buffer.frameLength = 48000
-            for n in 0..<48000 { buffer.floatChannelData![0][n] = Float(0.5 * sin(2 * .pi * 997 * Double(n) / 48000)) }
-            for _ in 0..<3 { try file.write(from: buffer) }
+        // Write a canonical PCM WAV directly. AVAudioFile's writer can keep its
+        // header unfinalized until an autorelease pool drains in the test host.
+        var data = Data()
+        func word<T: FixedWidthInteger>(_ value: T) {
+            var little = value.littleEndian
+            Swift.withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
         }
+        let frames = 48000 * 3
+        data.append(Data("RIFF".utf8)); word(UInt32(36 + frames * 2)); data.append(Data("WAVEfmt ".utf8))
+        word(UInt32(16)); word(UInt16(1)); word(UInt16(1)); word(UInt32(48000)); word(UInt32(96000))
+        word(UInt16(2)); word(UInt16(16)); data.append(Data("data".utf8)); word(UInt32(frames * 2))
+        for n in 0..<frames { word(Int16(16383 * sin(2 * .pi * 997 * Double(n) / 48000))) }
+        try data.write(to: url)
         let song = Song(id: "00000000001", title: "Tone", artist: "Test", duration: 3, fileName: "tone.wav", favorite: true, audioTimingVersion: 1)
         let list = try store.createPlaylist("Keep")
         try store.save(song, playlistIDs: [list])
         return (store, song)
+    }
+    func testActualAACFixtureCanBeMeasuredWithoutChangingItsBytes() async throws {
+        let (store, _) = try fixture()
+        let source = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "audio-fixtures", withExtension: "json"))
+        let fixtures = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: source))
+        let bytes = try XCTUnwrap(fixtures["regular"].flatMap { Data(base64Encoded: $0) })
+        let url = store.root.appendingPathComponent("actual.m4a")
+        try bytes.write(to: url)
+        let lufs = try await Loudness.read(url)
+        XCTAssertNotNil(lufs); XCTAssertEqual(try Data(contentsOf: url), bytes)
     }
     func testReadAndCacheLeaveAudioAndMembershipsUntouched() async throws {
         let (store, song) = try fixture()
