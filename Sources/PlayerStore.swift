@@ -150,6 +150,18 @@ final class PlayerStore: ObservableObject {
         load(updated, autoplay: wasPlaying)
         seek(min(position, updated.duration))
     }
+    func releaseRemovedDownload(_ id: String) {
+        if preview.song?.id == id { preview.stop(resume: current?.id != id) }
+        guard current?.id == id else { return }
+        pause()
+        durationTask?.cancel(); statusObservation = nil
+        player.replaceCurrentItem(with: nil)
+        current = library.song(id)
+        elapsed = 0; duration = current?.duration ?? 0
+        updateNowPlaying()
+        // Keep queue position, shuffle order and repeat mode. The next play
+        // resolves the online audio instead of continuing an unlinked local file.
+    }
     private func load(_ song: Song, autoplay: Bool = true) {
         preview.stop(resume: false)
         let song = library.song(song.id) ?? song

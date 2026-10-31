@@ -10,8 +10,10 @@ final class LibraryStore: ObservableObject {
     let root: URL
     private let database: URL
     private let fm = FileManager.default
+    private let removeDownloadedFile: (URL) throws -> Void
 
-    init(root: URL? = nil) {
+    init(root: URL? = nil, removeDownloadedFile: @escaping (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }) {
+        self.removeDownloadedFile = removeDownloadedFile
         self.root = root ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("UTubeMusic", isDirectory: true)
         database = self.root.appendingPathComponent("library.json")
@@ -44,6 +46,37 @@ final class LibraryStore: ObservableObject {
         return fm.fileExists(atPath: url.path)
     }
     func isPlayable(_ song: Song) -> Bool { isAvailable(song) || song.onlineOnly == true }
+    func canRemoveDownload(_ song: Song) -> Bool {
+        song.id.range(of: "^[A-Za-z0-9_-]{11}$", options: .regularExpression) != nil && song.fileName != nil
+    }
+    func removeDownload(_ id: String) throws {
+        guard let original = song(id), canRemoveDownload(original), let name = original.fileName,
+              let url = file(name), ["m4a", "mp3", "aac", "wav", "aif", "aiff", "caf"].contains(url.pathExtension.lowercased()),
+              name != original.artworkName else {
+            throw AppFailure("YouTubeから保存した曲のダウンロードだけを削除できます。読み込んだ音声ファイルはオンラインに切り替えられません。")
+        }
+        if fm.fileExists(atPath: url.path) {
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true else { throw AppFailure("音声ファイルの状態を確認できません。削除を中止しました。") }
+        }
+        // Persist the online registration before deleting any audio. A failed index
+        // write must leave the playable download and all memberships untouched.
+        try commit {
+            if let index = songs.firstIndex(where: { $0.id == id }) {
+                songs[index].fileName = nil
+                songs[index].bytes = 0
+                songs[index].onlineOnly = true
+                songs[index].audioTimingVersion = nil
+            }
+        }
+        guard !songs.contains(where: { $0.fileName == name }), fm.fileExists(atPath: url.path) else { return }
+        do { try removeDownloadedFile(url) }
+        catch {
+            do { try commit { if let index = songs.firstIndex(where: { $0.id == id }) { songs[index] = original } } }
+            catch { throw AppFailure("音声ファイルの削除と登録情報の復元に失敗しました。音声ファイルは残っています。ファイルアプリで確認してください。") }
+            throw AppFailure("音声ファイルを削除できなかったため、ダウンロード済みの状態に戻しました。")
+        }
+    }
     func addOnline(_ song: Song, favorite: Bool, playlistIDs: Set<UUID>) throws {
         var value = self.song(song.id) ?? song
         if !isAvailable(value) { value.onlineOnly = true }

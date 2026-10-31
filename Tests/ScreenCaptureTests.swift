@@ -5,6 +5,19 @@ import AVFoundation
 
 @MainActor
 final class ScreenCaptureTests: XCTestCase {
+    func testCaptureDownloadedLibrary() async throws {
+        let (library, player, music, _) = try playableLibrary()
+        defer { player.pause() }
+        try await render(NavigationStack { LibraryView(initialFilter: 3) }.environmentObject(library).environmentObject(player).environmentObject(music), name: "native-download-library")
+    }
+    func testCaptureDownloadRemovalMenu() async throws {
+        let (library, player, music, old) = try playableLibrary()
+        defer { player.pause() }
+        let song = Song(id: "00000000001", title: old.title, artist: old.artist, duration: old.duration,
+                        fileName: old.fileName, favorite: true)
+        try library.save(song, playlistIDs: [])
+        try await render(SongActionsSheet(song: song).environmentObject(library).environmentObject(player).environmentObject(music), name: "native-download-menu")
+    }
     private func render<V: View>(_ view: V, name: String, scrollToBottom: Bool = false, inspect: ((UIWindow) -> Void)? = nil) async throws {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previous = scene.windows.first { $0.isKeyWindow }

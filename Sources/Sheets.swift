@@ -141,6 +141,7 @@ struct SongActionsSheet: View {
     @EnvironmentObject private var player: PlayerStore
     @Environment(\.dismiss) private var dismiss
     @State private var delete = false
+    @State private var removeDownload = false
     var body: some View {
         NavigationStack {
             List {
@@ -153,6 +154,11 @@ struct SongActionsSheet: View {
                 }
                 if !library.isAvailable(song) {
                     Button { music.save(song, favorite: song.favorite, playlistIDs: []); dismiss() } label: { Label("オフライン用にダウンロード", systemImage: "arrow.down.circle") }
+                }
+                if library.canRemoveDownload(library.song(song.id) ?? song) {
+                    Button { removeDownload = true } label: {
+                        Label("ダウンロードだけ削除", systemImage: "arrow.down.circle.badge.xmark")
+                    }.accessibilityIdentifier("remove-download")
                 }
                 Button { player.start(library.songs, at: song); dismiss() } label: { Label("再生", systemImage: "play.fill") }.disabled(!library.isPlayable(song))
                 Button { player.enqueue(song); dismiss() } label: { Label("再生キューに追加", systemImage: "text.line.first.and.arrowtriangle.forward") }.disabled(!library.isPlayable(song))
@@ -175,6 +181,16 @@ struct SongActionsSheet: View {
                 .confirmationDialog("このiPhoneから曲を削除しますか？プレイリストからも外れます。検索から再保存できます。", isPresented: $delete, titleVisibility: .visible) {
                     Button("曲とファイルを削除", role: .destructive) {
                         do { try library.delete(song); player.remove(song.id); dismiss() } catch { library.message = error.localizedDescription }
+                    }
+                }
+                .confirmationDialog("音声ファイルだけ削除してオンライン再生に切り替えますか？お気に入り・プレイリスト・曲順・ジャケットは残ります。再生中の場合は停止します。", isPresented: $removeDownload, titleVisibility: .visible) {
+                    Button("ダウンロードだけ削除", role: .destructive) {
+                        do {
+                            try library.removeDownload(song.id)
+                            player.releaseRemovedDownload(song.id)
+                            library.message = "ダウンロードだけ削除しました。再生にはインターネット接続が必要です。"
+                            dismiss()
+                        } catch { library.message = error.localizedDescription }
                     }
                 }
         }.appFeedback().presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
@@ -275,7 +291,7 @@ struct SettingsView: View {
                         .font(.subheadline).foregroundStyle(Palette.secondary)
                 }
                 Section {
-                    LabeledContent("バージョン", value: "0.3.0 開発版")
+                    LabeledContent("バージョン", value: "0.3.1 開発版")
                     Text("個人用の音楽ライブラリ。曲の取得はYouTubeの仕様や制限により失敗する場合があります。")
                         .font(.caption).foregroundStyle(Palette.secondary)
                     Text("Python / yt-dlp / yt-dlp-ejs / certifi / yt-dlp-apple-webkit-jsi / ytmusicapi / requests を使用。ライセンスはアプリ内の同梱ファイル ThirdPartyNotices を参照。")
