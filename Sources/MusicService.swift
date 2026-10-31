@@ -24,6 +24,7 @@ struct EngineResponse: Decodable {
     let items: [CatalogItem]?
     let collection: CatalogItem?
     let unavailable: Int?
+    let suggestions: [String]?
     let preview_start: Double?
     let preview_end: Double?
     let preview_kind: String?
@@ -132,12 +133,13 @@ final class MusicService: ObservableObject {
         library.message = candidates.isEmpty ? "修復が必要な曲はありません。" : "\(repaired)曲の再生時間を修復しました。" +
             (failures.isEmpty ? "" : "\n修復できなかった曲は元のまま保持しています。\n" + failures.joined(separator: "\n"))
     }
-    func saveCollection(_ songs: [Song], title: String, sourceID: String, favorite: Bool) throws {
+    func saveCollection(_ songs: [Song], title: String, sourceID: String, favorite: Bool, download: Bool = true) throws {
         guard !songs.isEmpty else { throw AppFailure("保存できる曲がありません。") }
         // Reuse only the same imported source; a user's equally named list is separate.
         let playlistID = try library.playlists.first(where: { $0.sourceID == sourceID })?.id ?? library.createPlaylist(title)
         try library.setSourceOrder(songs.map(\.id), sourceID: sourceID, for: playlistID)
         for song in songs {
+            if !download { try library.addOnline(song, favorite: favorite, playlistIDs: [playlistID]); continue }
             if let index = jobs.firstIndex(where: { $0.song.id == song.id && !$0.finished && $0.error == nil }) {
                 jobs[index].playlistIDs.insert(playlistID)
                 jobs[index].song.favorite = jobs[index].song.favorite || favorite

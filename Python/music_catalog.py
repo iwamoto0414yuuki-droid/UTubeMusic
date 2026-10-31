@@ -55,6 +55,9 @@ def dispatch(request):
         # The pinned parser currently misses filtered search shelves in Japanese.
         # Keep home headings Japanese; English metadata parsing preserves song titles.
         api = YTMusic(requests_session=session, language="ja" if op == "home" else "en", location="JP")
+        if op == "suggestions":
+            query = str(request.get("query", "")).strip()[:100]
+            return {"ok": True, "suggestions": api.get_search_suggestions(query)[:8] if query and "://" not in query else []}
         if op == "home":
             sections = []
             seen = set()

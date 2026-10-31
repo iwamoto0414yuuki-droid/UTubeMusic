@@ -11,9 +11,13 @@ final class PlayerStore: ObservableObject {
     @Published private(set) var queue = PlaybackQueue()
     @Published var error: String?
     private let player = AVPlayer()
+    private let request: ([String: String]) async throws -> EngineResponse
+    private let streamItem: (URL, [String: Any]) -> AVPlayerItem
     private let library: LibraryStore
     private var timeObserver: Any?
     private var statusObservation: NSKeyValueObservation?
+    private var streamTask: Task<Void, Never>?
+    private var streamGeneration = UUID()
     private var durationTask: Task<Void, Never>?
     private var notifications: [NSObjectProtocol] = []
     private var resumeAfterInterruption = false
@@ -29,7 +33,10 @@ final class PlayerStore: ObservableObject {
         preview.toggle(song, localURL: local)
     }
 
-    init(library: LibraryStore) {
+    init(library: LibraryStore,
+         request: @escaping ([String: String]) async throws -> EngineResponse = { try await PythonService.shared.request($0) },
+         streamItem: @escaping (URL, [String: Any]) -> AVPlayerItem = { AVPlayerItem(asset: AVURLAsset(url: $0, options: $1)) }) {
+        self.request = request; self.streamItem = streamItem
         self.library = library
         do { try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default) }
         catch { self.error = error.localizedDescription }
@@ -76,14 +83,15 @@ final class PlayerStore: ObservableObject {
         configureCommands()
     }
     func start(_ songs: [Song], at song: Song, shuffle: Bool = false) {
-        let available = songs.filter(library.isAvailable)
+        let available = songs.filter(library.isPlayable)
         guard available.contains(where: { $0.id == song.id }) else { error = "音声ファイルが見つかりません。検索からもう一度保存してください。"; return }
         queue.start(available.map(\.id), at: song.id, shuffle: shuffle)
         load(song)
     }
     func play() {
         preview.stop(resume: false)
-        guard current != nil else { return }
+        guard let current else { return }
+        if player.currentItem == nil, current.onlineOnly == true { load(current); return }
         if duration > 0 && elapsed >= duration - 0.1 { seek(0) }
         do {
             try AVAudioSession.sharedInstance().setActive(true)
@@ -91,7 +99,7 @@ final class PlayerStore: ObservableObject {
         } catch { self.error = error.localizedDescription }
     }
     private func pauseMain() { player.pause(); playing = false; updateNowPlaying() }
-    func pause() { preview.stop(resume: false); pauseMain() }
+    func pause() { streamGeneration = UUID(); streamTask?.cancel(); preview.stop(resume: false); pauseMain() }
     func toggle() {
         if preview.song != nil { preview.stop(resume: false) }
         else { playing ? pause() : play() }
@@ -109,7 +117,7 @@ final class PlayerStore: ObservableObject {
         var inspected = Set<String>()
         while let id = queue.advance(automatically: automatically) {
             guard inspected.insert(id).inserted else { break }
-            if let song = library.song(id), library.isAvailable(song) { load(song); return }
+            if let song = library.song(id), library.isPlayable(song) { load(song); return }
         }
         pause()
         if automatically { seek(duration) }
@@ -117,7 +125,7 @@ final class PlayerStore: ObservableObject {
     func previous() {
         preview.stop(resume: false)
         if elapsed > 3 { seek(0); return }
-        if let id = queue.previous(), let song = library.song(id), library.isAvailable(song) { load(song) }
+        if let id = queue.previous(), let song = library.song(id), library.isPlayable(song) { load(song) }
         else { seek(0) }
     }
     func toggleShuffle() { queue.toggleShuffle() }
@@ -131,7 +139,7 @@ final class PlayerStore: ObservableObject {
         if wasCurrent {
             pause(); player.replaceCurrentItem(with: nil); current = nil; elapsed = 0; duration = 0
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-            if let next = queue.current, let song = library.song(next), library.isAvailable(song) { load(song) }
+            if let next = queue.current, let song = library.song(next), library.isPlayable(song) { load(song) }
         }
     }
     func refreshAfterAudioRepair() {
@@ -144,6 +152,10 @@ final class PlayerStore: ObservableObject {
     private func load(_ song: Song, autoplay: Bool = true) {
         preview.stop(resume: false)
         let song = library.song(song.id) ?? song
+        streamGeneration = UUID(); streamTask?.cancel()
+        if !library.isAvailable(song), song.onlineOnly == true {
+            loadOnline(song, autoplay: autoplay); return
+        }
         guard let url = library.file(song.fileName), library.isAvailable(song) else { error = "音声ファイルが見つかりません。"; return }
         statusObservation = nil
         durationTask?.cancel()
@@ -188,6 +200,41 @@ final class PlayerStore: ObservableObject {
             }
         }
         if autoplay { play() } else { playing = false; updateNowPlaying() }
+    }
+    private func loadOnline(_ song: Song, autoplay: Bool) {
+        let token = streamGeneration
+        durationTask?.cancel(); statusObservation = nil
+        player.pause(); player.replaceCurrentItem(with: nil)
+        current = song; elapsed = 0; duration = song.duration; playing = false
+        artwork = nil; updateNowPlaying()
+        streamTask = Task { [weak self] in
+            do {
+                let response = try await self?.request(["op": "resolve", "id": song.id])
+                guard let response else { return }
+                try Task.checkCancellation()
+                guard let self, self.streamGeneration == token else { return }
+                guard let text = response.url, let url = URL(string: text), url.scheme == "https",
+                      url.host?.hasSuffix(".googlevideo.com") == true else { throw AppFailure("音声の取得先を確認できません。") }
+                var options: [String: Any] = [:]
+                if let agent = response.headers?.first(where: { $0.key.lowercased() == "user-agent" })?.value { options[AVURLAssetHTTPUserAgentKey] = agent }
+                let item = self.streamItem(url, options)
+                self.duration = response.song?.duration ?? song.duration
+                if self.duration > 0 { item.forwardPlaybackEndTime = CMTime(seconds: self.duration, preferredTimescale: 600) }
+                item.preferredForwardBufferDuration = 15
+                self.player.replaceCurrentItem(with: item)
+                self.statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
+                    Task { @MainActor in
+                        guard let self, self.player.currentItem === item else { return }
+                        if item.status == .failed { self.pause(); self.error = "オンライン再生に失敗しました。通信を確認して再生し直してください。" }
+                        else if item.status == .readyToPlay, self.duration <= 0, item.duration.seconds.isFinite { self.duration = item.duration.seconds; self.updateNowPlaying() }
+                    }
+                }
+                if autoplay { self.play() }
+            } catch is CancellationError {} catch {
+                guard let self, self.streamGeneration == token else { return }
+                self.playing = false; self.error = error.localizedDescription
+            }
+        }
     }
     private func updateNowPlaying() {
         guard let current else { return }

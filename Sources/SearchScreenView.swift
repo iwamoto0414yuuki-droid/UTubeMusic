@@ -47,6 +47,7 @@ struct SearchScreenView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         Color.clear.frame(height: 0).id("results-top")
+                        if searchFocused { SearchSuggestions(query: state.query) { state.query = $0; submit() } }
                         if state.submitted.isEmpty {
                             SectionTitle(title: "今の気分から探す", caption: "ジャンルを選んで、好きな音楽へ")
                             BrowseGenres { state.query = $0; state.kind = "songs"; submit() }

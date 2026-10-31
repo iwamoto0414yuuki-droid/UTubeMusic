@@ -22,7 +22,7 @@ enum SongAddDestination: Equatable {
         }
     }
     @MainActor func add(_ song: Song, to library: LibraryStore) throws {
-        guard var existing = library.song(song.id), library.isAvailable(existing) else {
+        guard var existing = library.song(song.id), library.isPlayable(existing) else {
             throw AppFailure("曲を保存してから追加してください。")
         }
         switch self {
@@ -65,7 +65,7 @@ struct AddSongsView: View {
         _mode = State(initialValue: initialMode)
     }
     private var savedSongs: [Song] {
-        let available = library.songs.filter(library.isAvailable)
+        let available = library.songs.filter(library.isPlayable)
         let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? available : available.filter { $0.title.localizedCaseInsensitiveContains(value) || $0.artist.localizedCaseInsensitiveContains(value) }
     }
@@ -101,6 +101,7 @@ struct AddSongsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         Color.clear.frame(height: 0).id("add-top")
+                        if mode == 0 && focused { SearchSuggestions(query: query) { query = $0; submit() } }
                         if mode == 1 {
                             if savedSongs.isEmpty {
                                 EmptyPanel(symbol: "music.note.list", title: "曲がありません", detail: "「新しい曲を検索」から曲を探して保存できます。")

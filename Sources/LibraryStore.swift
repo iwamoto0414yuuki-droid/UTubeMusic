@@ -43,6 +43,13 @@ final class LibraryStore: ObservableObject {
         guard let url = file(song.fileName) else { return false }
         return fm.fileExists(atPath: url.path)
     }
+    func isPlayable(_ song: Song) -> Bool { isAvailable(song) || song.onlineOnly == true }
+    func addOnline(_ song: Song, favorite: Bool, playlistIDs: Set<UUID>) throws {
+        var value = self.song(song.id) ?? song
+        if !isAvailable(value) { value.onlineOnly = true }
+        value.favorite = value.favorite || favorite
+        try save(value, playlistIDs: playlistIDs)
+    }
     func save(_ song: Song, playlistID: UUID?) throws {
         try save(song, playlistIDs: Set(playlistID.map { [$0] } ?? []))
     }

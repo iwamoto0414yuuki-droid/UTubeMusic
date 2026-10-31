@@ -95,7 +95,7 @@ struct SongSearchResults: View {
             else {
                 ForEach(search.results) { song in
                     let existing = library.song(song.id)
-                    let available = existing.map(library.isAvailable) ?? false
+                    let available = existing.map(library.isPlayable) ?? false
                     if let destination, let existing, available {
                         DestinationSongRow(song: existing, destination: destination)
                     } else {
@@ -178,9 +178,9 @@ struct RemoteCollectionView: View {
                     if store.unavailable > 0 { Text("非公開・再生不可・重複などの\(store.unavailable)件は一覧から除外しています。") .font(.caption).foregroundStyle(Palette.secondary) }
                     ForEach(store.songs) { song in
                         let existing = library.song(song.id)
-                        let available = existing.map(library.isAvailable) ?? false
+                        let available = existing.map(library.isPlayable) ?? false
                         SongRow(song: song, trailing: available ? "ellipsis" : "arrow.down.circle", allowsPreview: true) {
-                            if let existing, available { player.start(store.songs.compactMap { library.song($0.id) }.filter(library.isAvailable), at: existing) }
+                            if let existing, available { player.start(store.songs.compactMap { library.song($0.id) }.filter(library.isPlayable), at: existing) }
                             else { save = song }
                         } more: { if let existing, available { menu = existing } else { save = song } }
                     }

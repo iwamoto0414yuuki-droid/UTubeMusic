@@ -112,7 +112,7 @@ def preview_window(info):
 def dispatch(request_json):
     try:
         request = json.loads(request_json)
-        if request.get("op") in ("home", "catalog_search", "collection"):
+        if request.get("op") in ("home", "catalog_search", "collection", "suggestions"):
             import music_catalog
             return json.dumps(music_catalog.dispatch(request), ensure_ascii=False)
         import certifi

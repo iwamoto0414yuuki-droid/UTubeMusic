@@ -69,7 +69,7 @@ struct LibraryView: View {
                     } else {
                         LazyVStack(spacing: 3) {
                             ForEach(visibleSongs) { song in
-                                SongRow(song: song, subtitle: library.isAvailable(song) ? song.artist : "ファイルが見つかりません・再保存してください") {
+                                SongRow(song: song, subtitle: library.isPlayable(song) ? song.artist + (library.isAvailable(song) ? " · ダウンロード済み" : " · オンライン") : "ファイルが見つかりません・再保存してください") {
                                     player.start(visibleSongs, at: song)
                                 } more: { selected = song }
                             }
